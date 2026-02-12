@@ -22,24 +22,25 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-async function verifyData() {
-  console.log('🔍 Verifying Firebase Data...\n');
-  
-  const collections = ['users', 'customers', 'products', 'suppliers', 'bills', 'purchases'];
-  
-  for (const collectionName of collections) {
-    const snapshot = await db.collection(collectionName).get();
-    console.log(`📦 ${collectionName.toUpperCase()}: ${snapshot.size} documents`);
+async function resetGRNToOne() {
+  try {
+    console.log('🔄 Resetting GRN counter to start from 1...');
     
-    if (snapshot.size > 0 && snapshot.size <= 3) {
-      snapshot.forEach(doc => {
-        console.log(`   - ${doc.id}`);
-      });
-    }
+    await db.collection('counters').doc('grnNumber').set({
+      value: 0,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    console.log('✅ GRN counter reset to 0');
+    console.log('📝 Next GRN will be: 1');
+    console.log('');
+    console.log('🎉 Ready! Next purchase will get GRN #1');
+    
+  } catch (error) {
+    console.error('❌ Error resetting GRN counter:', error);
   }
   
-  console.log('\n✅ Verification complete!');
-  process.exit(0);
+  process.exit();
 }
 
-verifyData().catch(console.error);
+resetGRNToOne();

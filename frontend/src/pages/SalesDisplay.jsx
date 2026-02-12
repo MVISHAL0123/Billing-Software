@@ -9,12 +9,17 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
     dateTo: '',
     invoiceFrom: '',
     invoiceTo: '',
-    customerName: ''
+    customerName: '',
+    productName: ''
   });
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedCustomerIndex, setSelectedCustomerIndex] = useState(-1);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
@@ -22,11 +27,14 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
   
   const customerListRef = useRef(null);
   const customerInputRef = useRef(null);
+  const productListRef = useRef(null);
+  const productInputRef = useRef(null);
   const refreshIntervalRef = useRef(null);
 
   useEffect(() => {
     fetchSales();
     fetchCustomers();
+    fetchProducts();
     
     // Set up auto-refresh interval
     if (autoRefresh) {
@@ -56,6 +64,15 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
     }
   }, [selectedCustomerIndex]);
 
+  useEffect(() => {
+    if (selectedProductIndex >= 0 && productListRef.current) {
+      const selectedRow = productListRef.current.querySelector(`[data-index="${selectedProductIndex}"]`);
+      if (selectedRow) {
+        selectedRow.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedProductIndex]);
+
   const fetchSales = async (silent = false) => {
     if (!silent) {
       setLoading(true);
@@ -69,7 +86,13 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
       const data = await response.json();
 
       if (data.success) {
-        setSales(data.bills || []);
+        // Sort bills by invoice number in ascending order
+        const sortedBills = (data.bills || []).sort((a, b) => {
+          const invoiceA = parseInt(a.billNo) || 0;
+          const invoiceB = parseInt(b.billNo) || 0;
+          return invoiceA - invoiceB;
+        });
+        setSales(sortedBills);
       } else {
         console.error('Failed to fetch sales:', data.message);
         setSales([]);
@@ -105,6 +128,31 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('http://localhost:5003/api/products/list', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAllProducts(data.products || []);
+        } else {
+          console.error('Failed to fetch products:', data.message);
+          setAllProducts([]);
+        }
+      } else {
+        console.error('Failed to fetch products');
+        setAllProducts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setAllProducts([]);
+    }
+  };
+
   const applyFilters = () => {
     let result = [...sales];
 
@@ -135,6 +183,22 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
       );
     }
 
+    // Filter by Product Name
+    if (filters.productName.trim()) {
+      result = result.filter(sale =>
+        sale.items && sale.items.some(item =>
+          item.productName?.toLowerCase().includes(filters.productName.toLowerCase())
+        )
+      );
+    }
+
+    // Ensure results are sorted by invoice number in ascending order
+    result.sort((a, b) => {
+      const invoiceA = parseInt(a.billNo) || 0;
+      const invoiceB = parseInt(b.billNo) || 0;
+      return invoiceA - invoiceB;
+    });
+
     setFilteredSales(result);
   };
 
@@ -157,8 +221,22 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
           setShowCustomerDropdown(false);
           setSelectedCustomerIndex(-1);
         }
+      } else if (name === 'productName') {
+        if (value.trim()) {
+          const filtered = allProducts.filter(product =>
+            product.productName && product.productName.toLowerCase().includes(value.toLowerCase())
+          );
+          setFilteredProducts(filtered.map(p => p.productName));
+          setSelectedProductIndex(-1);
+          setShowProductDropdown(true);
+        } else {
+          setFilteredProducts([]);
+          setShowProductDropdown(false);
+          setSelectedProductIndex(-1);
+        }
       }
     }
+
   };
 
   const handleCustomerKeyDown = (e) => {
@@ -198,9 +276,47 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
     }
   };
 
+  const handleProductKeyDown = (e) => {
+    if (filteredProducts.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedProductIndex(prev => {
+        const newIndex = prev < filteredProducts.length - 1 ? prev + 1 : 0;
+        return newIndex;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedProductIndex(prev => {
+        const newIndex = prev > 0 ? prev - 1 : filteredProducts.length - 1;
+        return newIndex;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedProductIndex >= 0 && filteredProducts[selectedProductIndex]) {
+        selectProduct(filteredProducts[selectedProductIndex]);
+      } else if (filteredProducts.length > 0) {
+        selectProduct(filteredProducts[0]);
+      }
+    } else if (e.key === 'Escape') {
+      setSelectedProductIndex(-1);
+      setFilters(prev => ({ ...prev, productName: '' }));
+    }
+  };
+
+  const selectProduct = (productName) => {
+    setFilters(prev => ({ ...prev, productName: productName }));
+    setSelectedProductIndex(-1);
+    // Focus back to the input after selection
+    if (productInputRef.current) {
+      productInputRef.current.blur();
+    }
+  };
+
   const handleDisplay = () => {
     setDisplayClicked(true);
     setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
     applyFilters();
   };
 
@@ -211,11 +327,15 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
       dateTo: '',
       invoiceFrom: '',
       invoiceTo: '',
-      customerName: ''
+      customerName: '',
+      productName: ''
     });
     setFilteredCustomers([]);
+    setFilteredProducts([]);
     setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
     setSelectedCustomerIndex(-1);
+    setSelectedProductIndex(-1);
     setSelectedBill(null);
     fetchSales();
     setLastRefresh(new Date());
@@ -227,6 +347,46 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
 
   const calculateTotalRevenue = () => {
     return filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No Date';
+    
+    let date;
+    
+    try {
+      // Handle Firestore Timestamp object with _seconds property (from Firebase SDK)
+      if (dateString && typeof dateString === 'object' && dateString._seconds) {
+        date = new Date(dateString._seconds * 1000);
+      }
+      // Handle Firestore Timestamp object with seconds property
+      else if (dateString && typeof dateString === 'object' && dateString.seconds) {
+        date = new Date(dateString.seconds * 1000);
+      }
+      // Handle Firestore Timestamp with toDate method
+      else if (dateString && typeof dateString === 'object' && dateString.toDate) {
+        date = dateString.toDate();
+      }
+      // Handle regular date string
+      else {
+        date = new Date(dateString);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('Invalid date detected:', dateString);
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error, dateString);
+      return 'Date Error';
+    }
   };
 
   return (
@@ -322,20 +482,39 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
                   </div>
                 </div>
 
-                {/* Customer Name */}
-                <div className="flex items-center gap-3">
-                  <label className="text-xs font-semibold text-blue-700 w-20 flex-shrink-0">Customer</label>
-                  <input
-                    ref={customerInputRef}
-                    type="text"
-                    name="customerName"
-                    value={filters.customerName}
-                    onChange={handleFilterChange}
-                    onKeyDown={handleCustomerKeyDown}
-                    placeholder="Type customer name"
-                    className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                    autoComplete="off"
-                  />
+                {/* Customer and Product Names - Side by Side */}
+                <div className="flex gap-4">
+                  {/* Customer Name */}
+                  <div className="flex-1 flex items-center gap-3">
+                    <label className="text-xs font-semibold text-blue-700 w-20 flex-shrink-0">Customer</label>
+                    <input
+                      ref={customerInputRef}
+                      type="text"
+                      name="customerName"
+                      value={filters.customerName}
+                      onChange={handleFilterChange}
+                      onKeyDown={handleCustomerKeyDown}
+                      placeholder="Type customer name"
+                      className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  {/* Product Name */}
+                  <div className="flex-1 flex items-center gap-3">
+                    <label className="text-xs font-semibold text-blue-700 w-20 flex-shrink-0">Product</label>
+                    <input
+                      ref={productInputRef}
+                      type="text"
+                      name="productName"
+                      value={filters.productName}
+                      onChange={handleFilterChange}
+                      onKeyDown={handleProductKeyDown}
+                      placeholder="Type product name"
+                      className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      autoComplete="off"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -378,7 +557,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
           <div className="bg-white border border-blue-100 rounded-xl shadow-sm flex flex-col">
             <div className="bg-blue-50 px-3 py-2 rounded-t-xl border-b border-blue-100">
               <h2 className="text-blue-800 font-bold text-xs uppercase tracking-wide">
-                {filters.customerName ? 'CUSTOMER SELECTION' : 'SELECTION PANEL'}
+                {filters.customerName ? 'CUSTOMER SELECTION' : filters.productName ? 'PRODUCT SELECTION' : 'SELECTION PANEL'}
               </h2>
             </div>
             <div className="p-2 flex-1 overflow-auto">
@@ -433,6 +612,56 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
                   </div>
                   <p className="text-gray-500 text-sm">No customers found matching "{filters.customerName}"</p>
                 </div>
+              ) : showProductDropdown && filteredProducts.length > 0 ? (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-green-700 mb-2">Available Products</h3>
+                  <div ref={productListRef} className="bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
+                    {filteredProducts.map((product, index) => (
+                      <div
+                        key={product}
+                        data-index={index}
+                        className={`p-2 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-green-50 transition-colors ${
+                          selectedProductIndex === index
+                            ? 'bg-green-200 border-green-400 ring-1 ring-green-300'
+                            : filters.productName === product
+                            ? 'bg-green-100 border-green-300'
+                            : ''
+                        }`}
+                        onClick={() => {
+                          setFilters(prev => ({ ...prev, productName: product }));
+                          setSelectedProductIndex(-1);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">{product}</div>
+                          </div>
+                          {selectedProductIndex === index && (
+                            <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                              <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : showProductDropdown && filters.productName ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-sm">No products found matching "{filters.productName}"</p>
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -440,7 +669,29 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
-                  <p className="text-gray-500 text-sm italic">Type customer name to see options</p>
+                  <p className="text-gray-500 text-sm italic">Type customer or product name to see options</p>
+                </div>
+              )}
+
+              {/* Selected Info */}
+              {filters.productName && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div>
+                    <h3 className="text-sm font-semibold text-green-700 mb-2">Selected Product</h3>
+                    <div className="bg-green-50 rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="font-bold text-green-800">{filters.productName}</div>
+                          <div className="text-xs text-green-600 mt-1">Product Item</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -505,11 +756,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {new Date(sale.date).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
+                        {formatDate(sale.date)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">{sale.customer?.customerName || 'N/A'}</div>

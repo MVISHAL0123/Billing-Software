@@ -9,6 +9,11 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomerIndex, setSelectedCustomerIndex] = useState(-1);
   const [selectedCustomerState, setSelectedCustomerState] = useState(null);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmType, setConfirmType] = useState('warning');
   const [customerSearchFocused, setCustomerSearchFocused] = useState(false);
   const [activeProductRow, setActiveProductRow] = useState(null);
   const [productSearch, setProductSearch] = useState('');
@@ -377,7 +382,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       return convertTwoDigit(n);
     };
 
-    const integerPart = Math.floor(num);
+    let integerPart = Math.floor(num);
     const decimalPart = Math.round((num - integerPart) * 100);
 
     let result = '';
@@ -407,84 +412,31 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     return result.trim() + ' Only';
   };
 
-  const handleClear = () => {
-    setBillItems([{
-      id: Date.now(),
-      productName: '',
-      qty: 1,
-      rate: 0,
-      purchaseRate: 0,
-      profitPerItem: 0,
-      amount: 0,
-      totalProfit: 0
-    }]);
-    setSelectedCustomerState(null);
-    setCustomerSearch('');
-    setCustomerSearchFocused(false);
-    setDate(new Date().toISOString().split('T')[0]);
-    generateBillNo();
-    setCurrentBillIndex(-1);
+  // Confirmation dialog helper
+  const showConfirmation = (message, action, type = 'warning') => {
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmType(type);
+    setShowConfirmDialog(true);
   };
 
-  const handleSave = async () => {
-    if (billItems.length === 0 || (billItems.length === 1 && !billItems[0].productName)) {
-      alert('Please add at least one item');
-      return;
+  const handleConfirmYes = () => {
+    if (confirmAction) {
+      confirmAction();
     }
+    setShowConfirmDialog(false);
+    setConfirmAction(null);
+  };
 
-    // Filter out empty rows and calculate profit for each item
-    const validItems = billItems
-      .filter(item => item.productName && item.productName.trim() !== '')
-      .map(item => ({
-        ...item,
-        profitPerItem: item.profitPerItem || 0,
-        totalProfit: item.totalProfit || 0,
-        purchaseRate: item.purchaseRate || 0
-      }));
+  const handleConfirmNo = () => {
+    setShowConfirmDialog(false);
+    setConfirmAction(null);
+  };
 
-    const totalProfit = validItems.reduce((sum, item) => sum + (item.totalProfit || 0), 0);
-    const totalSales = calculateTotal();
-    const marginPercentage = totalSales > 0 ? ((totalProfit / (totalSales - totalProfit)) * 100) : 0;
-
-    const billData = {
-      billNo,
-      date,
-      customer: selectedCustomerState || {
-        customerName: '',
-        phoneNumber: '',
-        place: ''
-      },
-      items: validItems,
-      subtotal: calculateSubtotal(),
-      total: totalSales,
-      totalProfit: totalProfit,
-      marginPercentage: marginPercentage.toFixed(2)
-    };
-
-    try {
-      console.log('Saving bill:', billData);
-      
-      const response = await fetch('http://localhost:5003/api/bills/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(billData)
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('Bill saved successfully!');
-        
-        // Refresh bills list
-        await fetchAllBills();
-        
-        // Get next bill number from server
-        await generateBillNo();
-        
-        // Create new empty form
+  const handleClear = () => {
+    showConfirmation(
+      'Are you sure you want to clear all data? This action cannot be undone.',
+      () => {
         setBillItems([{
           id: Date.now(),
           productName: '',
@@ -497,15 +449,108 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
         }]);
         setSelectedCustomerState(null);
         setCustomerSearch('');
+        setCustomerSearchFocused(false);
         setDate(new Date().toISOString().split('T')[0]);
+        generateBillNo();
         setCurrentBillIndex(-1);
-      } else {
-        alert('Error saving bill: ' + data.message);
-      }
-    } catch (error) {
-      console.error('Error saving bill:', error);
-      alert('Error saving bill. Please try again.');
+        setSaveMessage('✅ Data cleared successfully!');
+        setTimeout(() => setSaveMessage(''), 2000);
+      },
+      'warning'
+    );
+  };
+
+  const handleSave = async () => {
+    // Quick validation check
+    const hasValidItems = billItems.some(item => item.productName && item.productName.trim() !== '');
+    if (!hasValidItems) {
+      setSaveMessage('❌ Please add at least one item');
+      setTimeout(() => setSaveMessage(''), 2000);
+      return;
     }
+
+    // Immediate UI feedback (no loading state)
+    setSaveMessage('💾 Saved!');
+    
+    // Prepare data quickly
+    const validItems = billItems
+      .filter(item => item.productName && item.productName.trim() !== '')
+      .map(item => ({
+        ...item,
+        profitPerItem: item.profitPerItem || 0,
+        totalProfit: item.totalProfit || 0,
+        purchaseRate: item.purchaseRate || 0
+      }));
+
+    const totalProfit = validItems.reduce((sum, item) => sum + (item.totalProfit || 0), 0);
+    const totalSales = calculateTotal();
+
+    // Clear form immediately for instant response
+    const newBillNo = (parseInt(billNo) + 1).toString();
+    setBillNo(newBillNo);
+    setBillItems([{
+      id: Date.now(),
+      productName: '',
+      qty: 1,
+      rate: 0,
+      purchaseRate: 0,
+      profitPerItem: 0,
+      amount: 0,
+      totalProfit: 0
+    }]);
+    setSelectedCustomerState(null);
+    setCustomerSearch('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setCurrentBillIndex(-1);
+
+    // Save in background without blocking UI
+    const billData = {
+      billNo,
+      date,
+      customer: selectedCustomerState || {
+        customerName: '',
+        phoneNumber: '',
+        place: ''
+      },
+      items: validItems,
+      subtotal: calculateSubtotal(),
+      total: totalSales,
+      totalProfit: totalProfit,
+      marginPercentage: totalSales > 0 ? ((totalProfit / (totalSales - totalProfit)) * 100).toFixed(2) : 0
+    };
+
+    // Background save (non-blocking)
+    fetch('http://localhost:5003/api/bills/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(billData)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Update bill number from server if provided
+        if (data.nextBillNo) {
+          setBillNo(data.nextBillNo.toString());
+        }
+        // Update bills list in background
+        fetchAllBills().catch(console.error);
+      } else {
+        // Show error but don't revert the form
+        setSaveMessage('❌ Save failed - check connection');
+        setTimeout(() => setSaveMessage(''), 3000);
+      }
+    })
+    .catch(error => {
+      console.error('Save error:', error);
+      setSaveMessage('❌ Save failed - check connection');
+      setTimeout(() => setSaveMessage(''), 3000);
+    });
+
+    // Clear success message quickly
+    setTimeout(() => setSaveMessage(''), 1000);
   };
 
   const loadBillData = (bill) => {
@@ -533,7 +578,8 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       loadBillData(allBills[newIndex]);
     } else if (currentBillIndex === 0) {
       // At first bill, trying to go previous
-      alert('No record found');
+      setSaveMessage('⚠️ No previous record found');
+      setTimeout(() => setSaveMessage(''), 2000);
     } else if (currentBillIndex === -1 && allBills.length > 0) {
       // If not in view mode, go to last bill
       const newIndex = allBills.length - 1;
@@ -541,7 +587,8 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       loadBillData(allBills[newIndex]);
     } else {
       // No bills exist
-      alert('No record found');
+      setSaveMessage('⚠️ No record found');
+      setTimeout(() => setSaveMessage(''), 2000);
     }
   };
 
@@ -552,17 +599,20 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       loadBillData(allBills[newIndex]);
     } else if (currentBillIndex === allBills.length - 1) {
       // At last bill, trying to go next
-      alert('No record found');
+      setSaveMessage('⚠️ No next record found');
+      setTimeout(() => setSaveMessage(''), 2000);
     } else if (currentBillIndex === -1) {
       // In new bill mode, try to load first bill
       if (allBills.length > 0) {
         setCurrentBillIndex(0);
         loadBillData(allBills[0]);
       } else {
-        alert('No record found');
+        setSaveMessage('⚠️ No record found');
+        setTimeout(() => setSaveMessage(''), 2000);
       }
     } else {
-      alert('No record found');
+      setSaveMessage('⚠️ No record found');
+      setTimeout(() => setSaveMessage(''), 2000);
     }
   };
 
@@ -595,6 +645,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
           </div>
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={onNavigateToDashboard}
               className="px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
             >
@@ -773,6 +824,11 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                           type="number"
                           value={item.qty}
                           onChange={(e) => updateBillItem(item.id, 'qty', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                              e.preventDefault();
+                            }
+                          }}
                           min="1"
                           className="w-full px-2 py-1 text-center border-0 bg-transparent focus:outline-none focus:bg-blue-100 rounded-lg text-blue-700 font-semibold transition-all duration-200"
                         />
@@ -831,6 +887,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                 {/* Previous and Next buttons */}
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={handlePreviousBill}
                     className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                     title="Go to previous bill"
@@ -841,6 +898,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                     Previous
                   </button>
                   <button
+                    type="button"
                     onClick={handleNextBill}
                     className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                     title="Go to next bill"
@@ -918,9 +976,23 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                   </div>
                 </div>
                 
+                {/* Save Message */}
+                {saveMessage && (
+                  <div className={`text-center py-2 px-4 rounded-lg font-semibold ${
+                    saveMessage.includes('💾') || saveMessage.includes('✅')
+                      ? 'bg-green-100 text-green-800 border border-green-300' 
+                      : saveMessage.includes('❌')
+                      ? 'bg-red-100 text-red-800 border border-red-300'
+                      : 'bg-blue-100 text-blue-800 border border-blue-300'
+                  }`}>
+                    {saveMessage}
+                  </div>
+                )}
+                
                 {/* Action buttons */}
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={handleClear}
                     className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center gap-2"
                   >
@@ -930,6 +1002,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                     Clear
                   </button>
                   <button
+                    type="button"
                     onClick={handleSave}
                     className="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold px-8 py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center gap-2"
                   >
@@ -944,6 +1017,51 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md mx-4 shadow-2xl border-2 border-blue-200">
+            <div className="flex items-center mb-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${
+                confirmType === 'warning' ? 'bg-yellow-100' : 'bg-blue-100'
+              }`}>
+                {confirmType === 'warning' ? (
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">Confirmation Required</h3>
+            </div>
+            <p className="text-gray-700 mb-6 leading-relaxed">{confirmMessage}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={handleConfirmNo}
+                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmYes}
+                className={`px-6 py-2 text-white rounded-lg transition-colors font-medium ${
+                  confirmType === 'warning' 
+                    ? 'bg-red-500 hover:bg-red-600' 
+                    : 'bg-blue-500 hover:bg-blue-600'
+                }`}
+              >
+                ✓ Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

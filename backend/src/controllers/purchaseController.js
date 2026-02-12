@@ -1,6 +1,7 @@
 import Purchase from '../models/Purchase.js';
 import Product from '../models/Product.js';
 import firebaseService from '../services/firebaseService.js';
+import admin from 'firebase-admin';
 
 // Create a new purchase
 export const createPurchase = async (req, res) => {
@@ -23,7 +24,7 @@ export const createPurchase = async (req, res) => {
     const purchaseData = {
       billNo,
       grnNo,
-      date: new Date(date),
+      date: admin.firestore.Timestamp.fromDate(new Date(date)),
       supplier: {
         supplierId: supplier.id,
         supplierName: supplier.supplierName,
@@ -43,6 +44,9 @@ export const createPurchase = async (req, res) => {
 
     // Reserve (increment) the GRN number counter after successful save
     await firebaseService.reserveGRNNumber();
+    
+    // Get the next GRN number for response
+    const nextGrnNo = await firebaseService.generateGRNNumber();
 
     // Update product stocks and prices
     for (const item of items) {
@@ -87,7 +91,8 @@ export const createPurchase = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Purchase created successfully and stocks updated',
-      purchase: savedPurchase.toJSON()
+      purchase: savedPurchase.toJSON(),
+      nextGrnNo: nextGrnNo
     });
   } catch (error) {
     console.error('Error creating purchase:', error);

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, onNavigateToAddProduct, onNavigateToAddCustomer, onNavigateToAddSupplier, onNavigateToSales, onNavigateToSalesDisplay, onNavigateToSalesReport, onNavigateToPurchase, onNavigateToPurchaseDisplay }) => {
+const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, onNavigateToAddProduct, onNavigateToAddCustomer, onNavigateToAddSupplier, onNavigateToSales, onNavigateToSalesDisplay, onNavigateToSalesReport, onNavigateToPurchase, onNavigateToPurchaseDisplay, onNavigateToStock }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isSalesOpen, setIsSalesOpen] = useState(false);
@@ -210,6 +210,21 @@ const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, o
                               <div className="absolute inset-0 bg-blue-600 rounded-full opacity-0 group-hover/item:opacity-10 transition-opacity"></div>
                             </div>
                             <span>Purchase Display</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setIsPurchaseOpen(false);
+                              onNavigateToStock();
+                            }}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-gray-700 hover:bg-blue-50 transition-all duration-200 font-medium group/item"
+                          >
+                            <div className="relative">
+                              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                              <div className="absolute inset-0 bg-blue-600 rounded-full opacity-0 group-hover/item:opacity-10 transition-opacity"></div>
+                            </div>
+                            <span>Stock Management</span>
                           </button>
                         </div>
                       </div>

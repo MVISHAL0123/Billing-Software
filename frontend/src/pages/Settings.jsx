@@ -177,11 +177,10 @@ const Settings = ({ user, onUpdateUser }) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-2">
             Account Settings
           </h1>
-          <p className="text-gray-600">Update your account information</p>
         </div>
 
         {/* Two Column Layout for Admin */}
@@ -189,7 +188,7 @@ const Settings = ({ user, onUpdateUser }) => {
           {/* Left Card - Admin Profile Settings */}
           <div>
             {/* Settings Form */}
-        <div className="bg-white rounded-2xl shadow-2xl border border-blue-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl border border-blue-100 overflow-hidden">
           {/* User Info Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-5">
             <div className="flex items-center gap-4">
@@ -242,7 +241,6 @@ const Settings = ({ user, onUpdateUser }) => {
                 placeholder="Enter your current password"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Required to verify your identity</p>
             </div>
 
             <hr className="border-blue-100" />
@@ -284,7 +282,6 @@ const Settings = ({ user, onUpdateUser }) => {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 transition-all outline-none"
                   placeholder="Enter new password (optional)"
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
               </div>
 
               <div>
@@ -313,23 +310,6 @@ const Settings = ({ user, onUpdateUser }) => {
               </button>
             </div>
           </form>
-        </div>
-
-        {/* Info Box */}
-        <div className="mt-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg">
-          <div className="flex items-start gap-2">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <p className="text-sm font-semibold text-blue-800">Security Tips</p>
-              <ul className="text-sm text-blue-700 mt-1 space-y-1">
-                <li>• Use a strong password with at least 6 characters</li>
-                <li>• Don't share your password with anyone</li>
-                <li>• Change your password regularly</li>
-              </ul>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -411,7 +391,6 @@ const Settings = ({ user, onUpdateUser }) => {
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 transition-all outline-none"
                       placeholder="Enter new password (optional)"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave blank to keep current password</p>
                   </div>
                 </div>
 
@@ -441,7 +420,7 @@ const Settings = ({ user, onUpdateUser }) => {
           )}
         </div>
       )}
-    </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import Bill from '../models/Bill.js';
 import Product from '../models/Product.js';
 import firebaseService from '../services/firebaseService.js';
+import admin from 'firebase-admin';
 
 // Create a new bill
 export const createBill = async (req, res) => {
@@ -18,7 +19,7 @@ export const createBill = async (req, res) => {
     // Create bill data
     const billData = {
       billNo,
-      date: new Date(date),
+      date: admin.firestore.Timestamp.fromDate(new Date(date)),
       customer: customer ? {
         customerId: customer.id || null,
         customerName: customer.customerName || 'Walk-in Customer',
@@ -49,6 +50,9 @@ export const createBill = async (req, res) => {
 
     // Reserve (increment) the bill number counter after successful save
     await firebaseService.reserveBillNumber();
+    
+    // Get the next bill number for response
+    const nextBillNo = await firebaseService.generateBillNumber();
 
     // Update product stocks - reduce stock for sales
     for (const item of items) {
@@ -82,7 +86,8 @@ export const createBill = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Bill created successfully and stocks updated',
-      bill: savedBill.toJSON()
+      bill: savedBill.toJSON(),
+      nextBillNo: nextBillNo
     });
   } catch (error) {
     console.error('Error creating bill:', error);

@@ -16,6 +16,8 @@ const Purchase = ({ onNavigateToDashboard }) => {
   const productContainerRef = useRef(null);
   const [allPurchases, setAllPurchases] = useState([]);
   const [currentPurchaseIndex, setCurrentPurchaseIndex] = useState(-1);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     generateGrnNo();
@@ -448,16 +450,25 @@ const Purchase = ({ onNavigateToDashboard }) => {
     // Use grnNo if billNo is empty
     const finalBillNo = billNo.trim() || grnNo;
     
+    // Quick validation
     if (!selectedSupplierState) {
-      alert('Please select a supplier');
+      setSuccessMessage('❌ Please select a supplier');
+      setTimeout(() => setSuccessMessage(''), 2000);
       return;
     }
-    if (billItems.length === 0 || (billItems.length === 1 && !billItems[0].productName)) {
-      alert('Please add at least one item');
+    
+    const hasValidItems = billItems.some(item => item.productName && item.productName.trim() !== '');
+    if (!hasValidItems) {
+      setSuccessMessage('❌ Please add at least one item');
+      setTimeout(() => setSuccessMessage(''), 2000);
       return;
     }
 
-    // Filter out empty rows and map to backend expected format
+    // Immediate UI feedback
+    setSuccessMessage('💾 Purchase Saved!');
+    setShowSuccess(true);
+    
+    // Prepare data quickly
     const validItems = billItems
       .filter(item => item.productName && item.productName.trim() !== '')
       .map(item => ({
@@ -471,9 +482,34 @@ const Purchase = ({ onNavigateToDashboard }) => {
         amount: item.amount
       }));
 
+    // Clear form immediately for instant response
+    const currentGrn = grnNo;
+    const nextGrnNo = 'GRN-' + (parseInt(grnNo.replace('GRN-', '')) + 1).toString().padStart(4, '0');
+    setGrnNo(nextGrnNo);
+    
+    setBillItems([{
+      id: Date.now(),
+      productName: '',
+      qty: 1,
+      purchaseRate: 0,
+      salesRate: 0,
+      margin: 0,
+      marginPercentage: 0,
+      freeQty: 0,
+      amount: 0
+    }]);
+    setSelectedSupplierState(null);
+    setSupplierSearch('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setBillNo('');
+    setCurrentPurchaseIndex(-1);
+    setActiveProductRow(null);
+    setProductSearch('');
+    setSelectedProductIndex(-1);
+
     const purchaseData = {
       billNo: finalBillNo,
-      grnNo,
+      grnNo: currentGrn,
       date,
       supplier: selectedSupplierState,
       items: validItems,
@@ -481,63 +517,46 @@ const Purchase = ({ onNavigateToDashboard }) => {
       total: calculateTotal()
     };
 
-    console.log('📦 Purchase data being sent:');
-    console.log('  - billNo:', purchaseData.billNo);
-    console.log('  - grnNo:', purchaseData.grnNo);
-    console.log('  - date:', purchaseData.date);
-    console.log('  - supplier:', purchaseData.supplier);
-    console.log('  - items count:', purchaseData.items?.length);
-    console.log('  - subtotal:', purchaseData.subtotal);
-    console.log('  - total:', purchaseData.total);
-    console.log('  - Full data:', JSON.stringify(purchaseData, null, 2));
-
-    try {
-      console.log('Saving purchase:', purchaseData);
-      const response = await fetch('http://localhost:5003/api/purchases/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(purchaseData)
-      });
-
-      const data = await response.json();
-      console.log('Purchase save response:', data);
-      
+    // Save in background without blocking UI
+    fetch('http://localhost:5003/api/purchases/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(purchaseData)
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
-        alert('Purchase saved successfully!');
-        localStorage.setItem('lastPurchaseGrnNo', grnNo);
-        await fetchAllPurchases();
-        
-        // Generate next GRN number from backend and clear form
-        await generateGrnNo();
-        
-        // Clear form but keep new GRN number
-        setBillItems([{
-          id: Date.now(),
-          productName: '',
-          qty: 1,
-          purchaseRate: 0,
-          salesRate: 0,
-          margin: 0,
-          marginPercentage: 0,
-          freeQty: 0,
-          amount: 0
-        }]);
-        setSelectedSupplierState(null);
-        setSupplierSearch('');
-        setDate(new Date().toISOString().split('T')[0]);
-        setBillNo('');
-        setCurrentPurchaseIndex(-1);
+        // Update GRN number from server if provided
+        if (data.nextGrnNo) {
+          setGrnNo(data.nextGrnNo);
+        }
+        // Update purchases list in background
+        fetchAllPurchases().catch(console.error);
+        localStorage.setItem('lastPurchaseGrnNo', currentGrn);
       } else {
-        console.error('Backend error:', data);
-        alert('Error saving purchase: ' + (data.message || data.error || 'Unknown error'));
+        setSuccessMessage('❌ Save failed - check connection');
+        setTimeout(() => setSuccessMessage(''), 3000);
       }
-    } catch (error) {
-      console.error('Error saving purchase:', error);
-      alert('Error saving purchase. Please check console for details.');
-    }
+    })
+    .catch(error => {
+      console.error('Save error:', error);
+      setSuccessMessage('❌ Save failed - check connection');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    });
+
+    // Clear success message quickly
+    setTimeout(() => {
+      setSuccessMessage('');
+      setShowSuccess(false);
+      // Focus supplier input for next entry
+      const supplierInput = document.getElementById('supplier-search-input');
+      if (supplierInput) {
+        supplierInput.focus();
+      }
+    }, 1000);
   };
 
   const loadPurchaseData = (purchase) => {
@@ -570,7 +589,8 @@ const Purchase = ({ onNavigateToDashboard }) => {
       loadPurchaseData(allPurchases[newIndex]);
     } else if (currentPurchaseIndex === 0) {
       // At first purchase, trying to go previous
-      alert('No record found');
+      setSuccessMessage('⚠️ No previous record found');
+      setTimeout(() => setSuccessMessage(''), 2000);
     } else if (currentPurchaseIndex === -1 && allPurchases.length > 0) {
       // If not in view mode, go to last purchase
       const newIndex = allPurchases.length - 1;
@@ -578,7 +598,8 @@ const Purchase = ({ onNavigateToDashboard }) => {
       loadPurchaseData(allPurchases[newIndex]);
     } else {
       // No purchases exist
-      alert('No record found');
+      setSuccessMessage('⚠️ No record found');
+      setTimeout(() => setSuccessMessage(''), 2000);
     }
   };
 
@@ -589,7 +610,8 @@ const Purchase = ({ onNavigateToDashboard }) => {
       loadPurchaseData(allPurchases[newIndex]);
     } else if (currentPurchaseIndex === allPurchases.length - 1) {
       // At last purchase, trying to go next
-      alert('No record found');
+      setSuccessMessage('⚠️ No next record found');
+      setTimeout(() => setSuccessMessage(''), 2000);
     } else if (currentPurchaseIndex === -1 && allPurchases.length > 0) {
       // If not in view mode, go to first purchase
       const newIndex = 0;
@@ -597,12 +619,30 @@ const Purchase = ({ onNavigateToDashboard }) => {
       loadPurchaseData(allPurchases[newIndex]);
     } else {
       // No purchases exist
-      alert('No record found');
+      setSuccessMessage('⚠️ No record found');
+      setTimeout(() => setSuccessMessage(''), 2000);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex flex-col">
+      {/* Simple Success Popup */}
+      {showSuccess && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">{successMessage}</span>
+            <button 
+              onClick={() => setShowSuccess(false)}
+              className="ml-2 text-white hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex flex-col relative">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex items-center justify-between shadow-xl">
@@ -619,6 +659,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
           </div>
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={onNavigateToDashboard}
               className="px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2"
             >
@@ -673,6 +714,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
                     <div className="flex items-center gap-3 max-w-md mb-2">
                       <label className="text-sm font-bold text-blue-800 whitespace-nowrap">Supplier:</label>
                       <input
+                        id="supplier-search-input"
                         type="text"
                         value={supplierSearch}
                         onChange={(e) => setSupplierSearch(e.target.value)}
@@ -876,6 +918,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
                 {/* Previous and Next buttons */}
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={handlePreviousPurchase}
                     className="flex items-center gap-2 px-4 py-3 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                     title="Go to previous purchase"
@@ -886,6 +929,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
                     Previous
                   </button>
                   <button
+                    type="button"
                     onClick={handleNextPurchase}
                     className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                     title="Go to next purchase"
@@ -975,6 +1019,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
                     Clear
                   </button>
                   <button
+                    type="button"
                     onClick={handleSave}
                     className="px-6 py-3 rounded-xl font-bold bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                   >

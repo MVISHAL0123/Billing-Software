@@ -14,10 +14,11 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
   });
   const [filteredSuppliers, setFilteredSuppliers] = useState([]);
   const [allSuppliers, setAllSuppliers] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedSupplierIndex, setSelectedSupplierIndex] = useState(-1);
-  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -25,14 +26,15 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
   const [displayClicked, setDisplayClicked] = useState(false);
   
   const supplierListRef = useRef(null);
-  const productListRef = useRef(null);
   const supplierInputRef = useRef(null);
+  const productListRef = useRef(null);
   const productInputRef = useRef(null);
   const refreshIntervalRef = useRef(null);
 
   useEffect(() => {
     fetchPurchases();
     fetchSuppliers();
+    fetchProducts();
     
     // Set up auto-refresh interval
     if (autoRefresh) {
@@ -84,7 +86,13 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setPurchases(data.purchases || []);
+          // Sort purchases by GRN number in ascending order
+          const sortedPurchases = (data.purchases || []).sort((a, b) => {
+            const grnA = parseInt(a.grnNo.replace(/\D/g, '')) || 0;
+            const grnB = parseInt(b.grnNo.replace(/\D/g, '')) || 0;
+            return grnA - grnB;
+          });
+          setPurchases(sortedPurchases);
         } else {
           console.error('Failed to fetch purchases:', data.message);
           setPurchases([]);
@@ -105,30 +113,52 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/suppliers');
+      const response = await fetch('http://localhost:5003/api/suppliers/list', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
-        setAllSuppliers(data);
+        if (data.success) {
+          setAllSuppliers(data.suppliers || []);
+        } else {
+          console.error('Failed to fetch suppliers:', data.message);
+          setAllSuppliers([]);
+        }
       } else {
         console.error('Failed to fetch suppliers');
+        setAllSuppliers([]);
       }
     } catch (error) {
       console.error('Error fetching suppliers:', error);
+      setAllSuppliers([]);
     }
   };
 
-  const extractProductsFromPurchases = () => {
-    const products = new Set();
-    purchases.forEach(purchase => {
-      if (purchase.items && Array.isArray(purchase.items)) {
-        purchase.items.forEach(product => {
-          if (product.productName) {
-            products.add(product.productName);
-          }
-        });
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('http://localhost:5003/api/products/list', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAllProducts(data.products || []);
+        } else {
+          console.error('Failed to fetch products:', data.message);
+          setAllProducts([]);
+        }
+      } else {
+        console.error('Failed to fetch products');
+        setAllProducts([]);
       }
-    });
-    return Array.from(products).sort();
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setAllProducts([]);
+    }
   };
 
   const applyFilters = () => {
@@ -159,12 +189,19 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
 
     // Filter by Product Name
     if (filters.productName) {
-      result = result.filter(purchase => {
-        return purchase.items?.some(product =>
-          product.productName?.toLowerCase().includes(filters.productName.toLowerCase())
-        );
-      });
+      result = result.filter(purchase =>
+        purchase.items && purchase.items.some(item =>
+          item.productName?.toLowerCase().includes(filters.productName.toLowerCase())
+        )
+      );
     }
+
+    // Ensure results are sorted by GRN number in ascending order
+    result.sort((a, b) => {
+      const grnA = parseInt(a.grnNo.replace(/\D/g, '')) || 0;
+      const grnB = parseInt(b.grnNo.replace(/\D/g, '')) || 0;
+      return grnA - grnB;
+    });
 
     setFilteredPurchases(result);
   };
@@ -178,7 +215,7 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
       if (name === 'supplierName') {
         if (value.trim()) {
           const filtered = allSuppliers.filter(supplier =>
-            supplier.supplierName?.toLowerCase().includes(value.toLowerCase())
+            supplier.supplierName && supplier.supplierName.toLowerCase().includes(value.toLowerCase())
           );
           setFilteredSuppliers(filtered);
           setSelectedSupplierIndex(-1);
@@ -190,11 +227,10 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
         }
       } else if (name === 'productName') {
         if (value.trim()) {
-          const allProducts = extractProductsFromPurchases();
           const filtered = allProducts.filter(product =>
-            product.toLowerCase().includes(value.toLowerCase())
+            product.productName && product.productName.toLowerCase().includes(value.toLowerCase())
           );
-          setFilteredProducts(filtered);
+          setFilteredProducts(filtered.map(p => p.productName));
           setSelectedProductIndex(-1);
           setShowProductDropdown(true);
         } else {
@@ -234,6 +270,15 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
     }
   };
 
+  const selectSupplier = (supplier) => {
+    setFilters(prev => ({ ...prev, supplierName: supplier.supplierName }));
+    setSelectedSupplierIndex(-1);
+    // Focus back to the input after selection
+    if (supplierInputRef.current) {
+      supplierInputRef.current.blur();
+    }
+  };
+
   const handleProductKeyDown = (e) => {
     if (filteredProducts.length === 0) return;
 
@@ -262,17 +307,8 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
     }
   };
 
-  const selectSupplier = (supplier) => {
-    setFilters(prev => ({ ...prev, supplierName: supplier.supplierName }));
-    setSelectedSupplierIndex(-1);
-    // Focus back to the input after selection
-    if (supplierInputRef.current) {
-      supplierInputRef.current.blur();
-    }
-  };
-
-  const selectProduct = (product) => {
-    setFilters(prev => ({ ...prev, productName: product }));
+  const selectProduct = (productName) => {
+    setFilters(prev => ({ ...prev, productName: productName }));
     setSelectedProductIndex(-1);
     // Focus back to the input after selection
     if (productInputRef.current) {
@@ -325,12 +361,43 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    if (!dateString) return 'No Date';
+    
+    let date;
+    
+    try {
+      // Handle Firestore Timestamp object with _seconds property (from Firebase SDK)
+      if (dateString && typeof dateString === 'object' && dateString._seconds) {
+        date = new Date(dateString._seconds * 1000);
+      }
+      // Handle Firestore Timestamp object with seconds property
+      else if (dateString && typeof dateString === 'object' && dateString.seconds) {
+        date = new Date(dateString.seconds * 1000);
+      }
+      // Handle Firestore Timestamp with toDate method
+      else if (dateString && typeof dateString === 'object' && dateString.toDate) {
+        date = dateString.toDate();
+      }
+      // Handle regular date string
+      else {
+        date = new Date(dateString);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('Invalid date detected:', dateString);
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error, dateString);
+      return 'Date Error';
+    }
   };
 
   return (
@@ -427,9 +494,9 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
                 </div>
 
                 {/* Supplier and Product Names - Side by Side */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex gap-4">
                   {/* Supplier Name */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex-1 flex items-center gap-3">
                     <label className="text-xs font-semibold text-blue-700 w-20 flex-shrink-0">Supplier</label>
                     <input
                       ref={supplierInputRef}
@@ -445,7 +512,7 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
                   </div>
 
                   {/* Product Name */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex-1 flex items-center gap-3">
                     <label className="text-xs font-semibold text-blue-700 w-20 flex-shrink-0">Product</label>
                     <input
                       ref={productInputRef}
@@ -506,13 +573,13 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
             </div>
             <div className="p-2 flex-1 overflow-auto">
               {/* Supplier Selection */}
-              {showSupplierDropdown && filteredSuppliers.length > 0 ? (
+              {filters.supplierName && filteredSuppliers.length > 0 ? (
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold text-blue-700 mb-2">Available Suppliers</h3>
                   <div ref={supplierListRef} className="bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
                     {filteredSuppliers.map((supplier, index) => (
                       <div
-                        key={supplier._id}
+                        key={supplier.id}
                         data-index={index}
                         className={`p-2 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-blue-50 transition-colors ${
                           selectedSupplierIndex === index
@@ -551,7 +618,7 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
                     ))}
                   </div>
                 </div>
-              ) : showSupplierDropdown && filters.supplierName && allSuppliers.length > 0 ? (
+              ) : filters.supplierName && allSuppliers.length > 0 ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const SalesReport = ({ user, onNavigateToDashboard }) => {
   const [sales, setSales] = useState([]);
@@ -9,10 +9,19 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
     dateFrom: '',
     dateTo: '',
     selectedCustomer: '',
-    selectedProduct: ''
+    selectedProduct: '',
+    customerName: '',
+    productName: ''
   });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [selectedCustomerIndex, setSelectedCustomerIndex] = useState(-1);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [displayClicked, setDisplayClicked] = useState(false);
   const [summary, setSummary] = useState({
     totalSales: 0,
     totalCost: 0,
@@ -20,6 +29,11 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
     totalMarginPercent: 0,
     totalBills: 0
   });
+  
+  const customerListRef = useRef(null);
+  const customerInputRef = useRef(null);
+  const productListRef = useRef(null);
+  const productInputRef = useRef(null);
 
   useEffect(() => {
     fetchSales();
@@ -35,6 +49,24 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
     calculateSummary();
   }, [filteredSales]);
 
+  useEffect(() => {
+    if (selectedCustomerIndex >= 0 && customerListRef.current) {
+      const selectedRow = customerListRef.current.querySelector(`[data-index="${selectedCustomerIndex}"]`);
+      if (selectedRow) {
+        selectedRow.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedCustomerIndex]);
+
+  useEffect(() => {
+    if (selectedProductIndex >= 0 && productListRef.current) {
+      const selectedRow = productListRef.current.querySelector(`[data-index="${selectedProductIndex}"]`);
+      if (selectedRow) {
+        selectedRow.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedProductIndex]);
+
   const fetchSales = async () => {
     setLoading(true);
     try {
@@ -46,7 +78,13 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
       const data = await response.json();
 
       if (data.success) {
-        setSales(data.bills || []);
+        // Sort sales by invoice number in ascending order
+        const sortedSales = (data.bills || []).sort((a, b) => {
+          const invoiceA = parseInt(a.billNo) || 0;
+          const invoiceB = parseInt(b.billNo) || 0;
+          return invoiceA - invoiceB;
+        });
+        setSales(sortedSales);
       } else {
         console.error('Failed to fetch sales:', data.message);
         setSales([]);
@@ -109,13 +147,34 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
           sale.customer._id === filters.selectedCustomer
         );
       }
+      // Also filter by customerName if using autocomplete
+      if (filters.customerName && filters.customerName.trim()) {
+        result = result.filter(sale =>
+          sale.customer?.customerName?.toLowerCase().includes(filters.customerName.toLowerCase())
+        );
+      }
     } else if (reportType === 'product') {
       if (filters.selectedProduct) {
         result = result.filter(sale => {
           return sale.items && sale.items.some(item => item.productId._id === filters.selectedProduct);
         });
       }
+      // Also filter by productName if using autocomplete
+      if (filters.productName && filters.productName.trim()) {
+        result = result.filter(sale =>
+          sale.items && sale.items.some(item =>
+            item.productName?.toLowerCase().includes(filters.productName.toLowerCase())
+          )
+        );
+      }
     }
+
+    // Ensure results are sorted by invoice number in ascending order
+    result.sort((a, b) => {
+      const invoiceA = parseInt(a.billNo) || 0;
+      const invoiceB = parseInt(b.billNo) || 0;
+      return invoiceA - invoiceB;
+    });
 
     setFilteredSales(result);
   };
@@ -216,14 +275,63 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
     });
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No Date';
+    
+    let date;
+    
+    try {
+      // Handle Firestore Timestamp object with _seconds property (from Firebase SDK)
+      if (dateString && typeof dateString === 'object' && dateString._seconds) {
+        date = new Date(dateString._seconds * 1000);
+      }
+      // Handle Firestore Timestamp object with seconds property
+      else if (dateString && typeof dateString === 'object' && dateString.seconds) {
+        date = new Date(dateString.seconds * 1000);
+      }
+      // Handle Firestore Timestamp with toDate method
+      else if (dateString && typeof dateString === 'object' && dateString.toDate) {
+        date = dateString.toDate();
+      }
+      // Handle regular date string
+      else {
+        date = new Date(dateString);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('Invalid date detected:', dateString);
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error, dateString);
+      return 'Date Error';
+    }
+  };
+
   const handleReportTypeChange = (type) => {
     setReportType(type);
+    setDisplayClicked(false);
     setFilters({
       dateFrom: '',
       dateTo: '',
       selectedCustomer: '',
-      selectedProduct: ''
+      selectedProduct: '',
+      customerName: '',
+      productName: ''
     });
+    setFilteredCustomers([]);
+    setFilteredProducts([]);
+    setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
+    setSelectedCustomerIndex(-1);
+    setSelectedProductIndex(-1);
   };
 
   const handleFilterChange = (e) => {
@@ -232,16 +340,128 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
       ...prev,
       [name]: value
     }));
+
+    // Only show dropdowns if display hasn't been clicked yet for autocomplete fields
+    if (!displayClicked && (reportType === 'customer' || reportType === 'product')) {
+      if (name === 'customerName' && reportType === 'customer') {
+        if (value.trim()) {
+          const filtered = customers.filter(customer =>
+            customer.customerName?.toLowerCase().includes(value.toLowerCase())
+          );
+          setFilteredCustomers(filtered);
+          setSelectedCustomerIndex(-1);
+          setShowCustomerDropdown(true);
+        } else {
+          setFilteredCustomers([]);
+          setShowCustomerDropdown(false);
+          setSelectedCustomerIndex(-1);
+        }
+      } else if (name === 'productName' && reportType === 'product') {
+        if (value.trim()) {
+          const filtered = products.filter(product =>
+            product.productName && product.productName.toLowerCase().includes(value.toLowerCase())
+          );
+          setFilteredProducts(filtered.map(p => p.productName));
+          setSelectedProductIndex(-1);
+          setShowProductDropdown(true);
+        } else {
+          setFilteredProducts([]);
+          setShowProductDropdown(false);
+          setSelectedProductIndex(-1);
+        }
+      }
+    }
+  };
+
+  const handleCustomerKeyDown = (e) => {
+    if (filteredCustomers.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedCustomerIndex(prev => {
+        const newIndex = prev < filteredCustomers.length - 1 ? prev + 1 : 0;
+        return newIndex;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedCustomerIndex(prev => {
+        const newIndex = prev > 0 ? prev - 1 : filteredCustomers.length - 1;
+        return newIndex;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedCustomerIndex >= 0 && filteredCustomers[selectedCustomerIndex]) {
+        selectCustomer(filteredCustomers[selectedCustomerIndex]);
+      } else if (filteredCustomers.length > 0) {
+        selectCustomer(filteredCustomers[0]);
+      }
+    } else if (e.key === 'Escape') {
+      setSelectedCustomerIndex(-1);
+      setFilters(prev => ({ ...prev, customerName: '' }));
+    }
+  };
+
+  const handleProductKeyDown = (e) => {
+    if (filteredProducts.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedProductIndex(prev => {
+        const newIndex = prev < filteredProducts.length - 1 ? prev + 1 : 0;
+        return newIndex;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedProductIndex(prev => {
+        const newIndex = prev > 0 ? prev - 1 : filteredProducts.length - 1;
+        return newIndex;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedProductIndex >= 0 && filteredProducts[selectedProductIndex]) {
+        selectProduct(filteredProducts[selectedProductIndex]);
+      } else if (filteredProducts.length > 0) {
+        selectProduct(filteredProducts[0]);
+      }
+    } else if (e.key === 'Escape') {
+      setSelectedProductIndex(-1);
+      setFilters(prev => ({ ...prev, productName: '' }));
+    }
+  };
+
+  const selectCustomer = (customer) => {
+    setFilters(prev => ({ ...prev, customerName: customer.customerName }));
+    setSelectedCustomerIndex(-1);
+    if (customerInputRef.current) {
+      customerInputRef.current.blur();
+    }
+  };
+
+  const selectProduct = (productName) => {
+    setFilters(prev => ({ ...prev, productName: productName }));
+    setSelectedProductIndex(-1);
+    if (productInputRef.current) {
+      productInputRef.current.blur();
+    }
   };
 
   const handleRefresh = () => {
     fetchSales();
+    setDisplayClicked(false);
     setFilters({
       dateFrom: '',
       dateTo: '',
       selectedCustomer: '',
-      selectedProduct: ''
+      selectedProduct: '',
+      customerName: '',
+      productName: ''
     });
+    setFilteredCustomers([]);
+    setFilteredProducts([]);
+    setShowCustomerDropdown(false);
+    setShowProductDropdown(false);
+    setSelectedCustomerIndex(-1);
+    setSelectedProductIndex(-1);
   };
 
   return (
@@ -288,152 +508,235 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
         <div className="grid grid-cols-4 gap-8">
           {/* Left Panel - Filters */}
           <div className="col-span-1">
-            <div className="bg-white rounded-2xl shadow-xl border border-blue-100 p-6 sticky top-20">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                </div>
-                <h2 className="text-lg font-bold text-blue-800">REPORT FILTERS</h2>
-              </div>
-
-              {/* Report Type Selection */}
-              <div className="space-y-3 mb-8">
-                <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-2">REPORT TYPE</div>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 cursor-pointer group p-3 rounded-lg hover:bg-blue-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="reportType"
-                      value="date"
-                      checked={reportType === 'date'}
-                      onChange={(e) => handleReportTypeChange(e.target.value)}
-                      className="w-4 h-4 text-blue-600 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800 group-hover:text-blue-700">Date Wise</div>
-                      <div className="text-xs text-gray-500">Filter by date range</div>
-                    </div>
-                    <div className={`w-3 h-3 rounded-full ${reportType === 'date' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer group p-3 rounded-lg hover:bg-blue-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="reportType"
-                      value="customer"
-                      checked={reportType === 'customer'}
-                      onChange={(e) => handleReportTypeChange(e.target.value)}
-                      className="w-4 h-4 text-blue-600 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800 group-hover:text-blue-700">Customer Wise</div>
-                      <div className="text-xs text-gray-500">Filter by customer</div>
-                    </div>
-                    <div className={`w-3 h-3 rounded-full ${reportType === 'customer' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer group p-3 rounded-lg hover:bg-blue-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="reportType"
-                      value="product"
-                      checked={reportType === 'product'}
-                      onChange={(e) => handleReportTypeChange(e.target.value)}
-                      className="w-4 h-4 text-blue-600 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800 group-hover:text-blue-700">Product Wise</div>
-                      <div className="text-xs text-gray-500">Filter by product</div>
-                    </div>
-                    <div className={`w-3 h-3 rounded-full ${reportType === 'product' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                  </label>
+            <div className="bg-white border border-blue-100 rounded-xl shadow-sm flex flex-col sticky top-20">
+              <div className="bg-blue-50 px-4 py-3 rounded-t-xl border-b border-blue-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-blue-800 font-bold text-xs uppercase tracking-wide">Report Filters</h2>
                 </div>
               </div>
-
-              {/* Filter Options */}
-              <div className="mb-8">
-                <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-3">FILTER OPTIONS</div>
-                
-                {reportType === 'date' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-blue-600 mb-2">FROM DATE</label>
+              
+              <div className="p-4 flex-1 overflow-auto">
+                {/* Report Type Selection */}
+                <div className="mb-5">
+                  <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-3">Report Type</div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-blue-50 transition-colors">
                       <input
-                        type="date"
-                        name="dateFrom"
-                        value={filters.dateFrom}
+                        type="radio"
+                        name="reportType"
+                        value="date"
+                        checked={reportType === 'date'}
+                        onChange={(e) => handleReportTypeChange(e.target.value)}
+                        className="w-3 h-3 text-blue-600 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-medium text-gray-800 group-hover:text-blue-700">Date Range</div>
+                        <div className="text-xs text-gray-500">Filter by dates</div>
+                      </div>
+                      <div className={`w-2 h-2 rounded-full ${reportType === 'date' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="reportType"
+                        value="customer"
+                        checked={reportType === 'customer'}
+                        onChange={(e) => handleReportTypeChange(e.target.value)}
+                        className="w-3 h-3 text-blue-600 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-medium text-gray-800 group-hover:text-blue-700">Customer Wise</div>
+                        <div className="text-xs text-gray-500">Filter by customer</div>
+                      </div>
+                      <div className={`w-2 h-2 rounded-full ${reportType === 'customer' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="reportType"
+                        value="product"
+                        checked={reportType === 'product'}
+                        onChange={(e) => handleReportTypeChange(e.target.value)}
+                        className="w-3 h-3 text-blue-600 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-medium text-gray-800 group-hover:text-blue-700">Product Wise</div>
+                        <div className="text-xs text-gray-500">Filter by product</div>
+                      </div>
+                      <div className={`w-2 h-2 rounded-full ${reportType === 'product' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Filter Options */}
+                <div className="mb-5">
+                  <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-3">Filter Options</div>
+                  
+                  {reportType === 'date' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-700 mb-1">Date From</label>
+                          <input
+                            type="date"
+                            name="dateFrom"
+                            value={filters.dateFrom}
+                            onChange={handleFilterChange}
+                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-700 mb-1">Date To</label>
+                          <input
+                            type="date"
+                            name="dateTo"
+                            value={filters.dateTo}
+                            onChange={handleFilterChange}
+                            className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {reportType === 'customer' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-blue-700 mb-1">Customer Search</label>
+                      <input
+                        ref={customerInputRef}
+                        type="text"
+                        name="customerName"
+                        value={filters.customerName}
                         onChange={handleFilterChange}
-                        className="w-full px-4 py-2.5 bg-white border-2 border-blue-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        onKeyDown={handleCustomerKeyDown}
+                        placeholder="Type customer name"
+                        className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        autoComplete="off"
                       />
                     </div>
+                  )}
+
+                  {reportType === 'product' && (
                     <div>
-                      <label className="block text-xs font-semibold text-blue-600 mb-2">TO DATE</label>
+                      <label className="block text-xs font-semibold text-blue-700 mb-1">Product Search</label>
                       <input
-                        type="date"
-                        name="dateTo"
-                        value={filters.dateTo}
+                        ref={productInputRef}
+                        type="text"
+                        name="productName"
+                        value={filters.productName}
                         onChange={handleFilterChange}
-                        className="w-full px-4 py-2.5 bg-white border-2 border-blue-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        onKeyDown={handleProductKeyDown}
+                        placeholder="Type product name"
+                        className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        autoComplete="off"
                       />
                     </div>
-                  </div>
-                )}
-
-                {reportType === 'customer' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-blue-600 mb-2">SELECT CUSTOMER</label>
-                    <select
-                      name="selectedCustomer"
-                      value={filters.selectedCustomer}
-                      onChange={handleFilterChange}
-                      className="w-full px-4 py-2.5 bg-white border-2 border-blue-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                    >
-                      <option value="">All Customers</option>
-                      {customers.map(customer => (
-                        <option key={customer._id} value={customer._id}>
-                          {customer.customerName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {reportType === 'product' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-blue-600 mb-2">SELECT PRODUCT</label>
-                    <select
-                      name="selectedProduct"
-                      value={filters.selectedProduct}
-                      onChange={handleFilterChange}
-                      className="w-full px-4 py-2.5 bg-white border-2 border-blue-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                    >
-                      <option value="">All Products</option>
-                      {products.map(product => (
-                        <option key={product._id} value={product._id}>
-                          {product.productName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Summary Card */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-xl p-4">
-                <div className="text-center mb-3">
-                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">FILTERED RESULTS</div>
-                  <div className="text-3xl font-bold text-blue-800 mt-1">{filteredSales.length}</div>
-                  <div className="text-xs text-blue-600">Bills Found</div>
+                  )}
                 </div>
-                <div className="text-center">
-                  <button
-                    onClick={handleRefresh}
-                    className="w-full bg-white text-blue-700 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
-                  >
-                    Reset Filters
-                  </button>
+
+                {/* Dropdown Display Section */}
+                {(showCustomerDropdown || showProductDropdown) && (
+                  <div className="mb-5">
+                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">
+                      {showCustomerDropdown ? 'Available Customers' : 'Available Products'}
+                    </div>
+                    
+                    {/* Customer Dropdown */}
+                    {showCustomerDropdown && filteredCustomers.length > 0 && (
+                      <div className="bg-gray-50 rounded-lg max-h-32 overflow-y-auto border border-gray-200">
+                        {filteredCustomers.map((customer, index) => (
+                          <div
+                            key={customer._id}
+                            ref={customerListRef}
+                            data-index={index}
+                            className={`p-2 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-blue-50 transition-colors text-xs ${
+                              selectedCustomerIndex === index
+                                ? 'bg-blue-100 border-blue-300'
+                                : ''
+                            }`}
+                            onClick={() => selectCustomer(customer)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-blue-100 rounded flex items-center justify-center">
+                                <svg className="w-2 h-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              </div>
+                              <div className="font-medium text-gray-900">{customer.customerName}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Product Dropdown */}
+                    {showProductDropdown && filteredProducts.length > 0 && (
+                      <div className="bg-gray-50 rounded-lg max-h-32 overflow-y-auto border border-gray-200">
+                        {filteredProducts.map((product, index) => (
+                          <div
+                            key={product}
+                            ref={productListRef}
+                            data-index={index}
+                            className={`p-2 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-green-50 transition-colors text-xs ${
+                              selectedProductIndex === index
+                                ? 'bg-green-100 border-green-300'
+                                : ''
+                            }`}
+                            onClick={() => selectProduct(product)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-green-100 rounded flex items-center justify-center">
+                                <svg className="w-2 h-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                              </div>
+                              <div className="font-medium text-gray-900">{product}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* No Results Messages */}
+                    {showCustomerDropdown && filteredCustomers.length === 0 && filters.customerName && (
+                      <div className="text-center py-3 text-gray-500 text-xs">
+                        No customers found matching "{filters.customerName}"
+                      </div>
+                    )}
+                    
+                    {showProductDropdown && filteredProducts.length === 0 && filters.productName && (
+                      <div className="text-center py-3 text-gray-500 text-xs">
+                        No products found matching "{filters.productName}"
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Summary Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-lg p-3">
+                  <div className="text-center mb-3">
+                    <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Filtered Results</div>
+                    <div className="text-2xl font-bold text-blue-800 mt-1">{filteredSales.length}</div>
+                    <div className="text-xs text-blue-600">Bills Found</div>
+                  </div>
+                  <div className="text-center">
+                    <button
+                      onClick={handleRefresh}
+                      className="w-full bg-white text-blue-700 font-semibold px-3 py-2 text-xs rounded-lg hover:bg-blue-50 transition-colors border border-blue-200 flex items-center justify-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Reset Filters
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -564,11 +867,7 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {new Date(sale.date).toLocaleDateString('en-IN', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                  year: 'numeric'
-                                })}
+                                {formatDate(sale.date)}
                               </div>
                             </td>
                             <td className="px-6 py-4">

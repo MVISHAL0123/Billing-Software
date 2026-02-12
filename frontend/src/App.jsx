@@ -10,6 +10,7 @@ import SalesDisplay from './pages/SalesDisplay';
 import SalesReport from './pages/SalesReport';
 import Purchase from './pages/purchase';
 import PurchaseDisplay from './pages/PurchaseDisplay';
+import Stock from './pages/Stock';
 import AddSupplier from './pages/AddSupplier';
 import Login from './pages/Login';
 
@@ -93,13 +94,17 @@ function App() {
     setCurrentPage('purchaseDisplay');
   };
 
+  const navigateToStock = () => {
+    setCurrentPage('stock');
+  };
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {currentPage !== 'sales' && currentPage !== 'salesDisplay' && currentPage !== 'salesReport' && currentPage !== 'purchase' && currentPage !== 'purchaseDisplay' && (
+      {currentPage !== 'sales' && currentPage !== 'salesDisplay' && currentPage !== 'salesReport' && currentPage !== 'purchase' && currentPage !== 'purchaseDisplay' && currentPage !== 'stock' && (
         <Header 
           user={user} 
           onLogout={handleLogout} 
@@ -113,6 +118,7 @@ function App() {
           onNavigateToSalesReport={navigateToSalesReport}
           onNavigateToPurchase={navigateToPurchase}
           onNavigateToPurchaseDisplay={navigateToPurchaseDisplay}
+          onNavigateToStock={navigateToStock}
         />
     
       )}
@@ -135,6 +141,8 @@ function App() {
           <Purchase user={user} onNavigateToDashboard={navigateToDashboard} />
         ) : currentPage === 'purchaseDisplay' ? (
           <PurchaseDisplay user={user} onNavigateToDashboard={navigateToDashboard} />
+        ) : currentPage === 'stock' ? (
+          <Stock user={user} onNavigateToDashboard={navigateToDashboard} />
         ) : (
           user?.role === 'admin' ? <Home /> : <StaffDashboard />
         )}
