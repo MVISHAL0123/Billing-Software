@@ -476,8 +476,7 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">SALES REPORT ANALYTICS</h1>
-              <p className="text-blue-100 text-sm">Detailed profit and margin analysis</p>
+              <h1 className="text-2xl font-bold text-white tracking-tight">SALES REPORT</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">

@@ -59,9 +59,20 @@ export const addProduct = async (req, res) => {
     });
   } catch (error) {
     console.error('Add product error:', error);
+    
+    // Check if this is a Firebase configuration error
+    if (error.message && error.message.includes('Firebase not connected')) {
+      return res.status(503).json({ 
+        success: false, 
+        message: '🔥 Database not configured. Please set up Firebase credentials to add products.',
+        error: 'FIREBASE_NOT_CONFIGURED'
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Server error. Please try again later.' 
+      message: 'Server error. Please try again later.',
+      error: error.message
     });
   }
 };
@@ -77,9 +88,20 @@ export const getProducts = async (req, res) => {
     });
   } catch (error) {
     console.error('Get products error:', error);
+    
+    // Check if this is a Firebase configuration error
+    if (error.message && error.message.includes('Firebase not connected')) {
+      return res.status(503).json({ 
+        success: false, 
+        message: '🔥 Database not configured. Please set up Firebase credentials to access product data.',
+        error: 'FIREBASE_NOT_CONFIGURED'
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Server error. Please try again later.' 
+      message: 'Server error. Please try again later.',
+      error: error.message
     });
   }
 };

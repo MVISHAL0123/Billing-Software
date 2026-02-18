@@ -401,7 +401,6 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
           </div>
           <div>
             <h1 className="text-xl font-bold">SALES DISPLAY</h1>
-            <p className="text-blue-100 text-sm">View and filter sales records</p>
           </div>
         </div>
         <button
@@ -618,7 +617,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
                   <div ref={productListRef} className="bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
                     {filteredProducts.map((product, index) => (
                       <div
-                        key={product}
+                        key={`product-${index}-${product}`}
                         data-index={index}
                         className={`p-2 cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-green-50 transition-colors ${
                           selectedProductIndex === index

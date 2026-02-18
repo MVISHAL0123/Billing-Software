@@ -654,7 +654,6 @@ const Purchase = ({ onNavigateToDashboard }) => {
             </div>
             <div>
               <h1 className="text-2xl font-bold drop-shadow-sm">PURCHASE BILLING</h1>
-              <p className="text-blue-100 text-sm">Professional Purchase Management</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

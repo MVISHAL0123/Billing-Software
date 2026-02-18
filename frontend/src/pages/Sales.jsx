@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Unique ID generator to prevent key collisions
+let idCounter = 0;
+const generateUniqueId = () => {
+  return `item_${Date.now()}_${++idCounter}`;
+};
+
 const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) => {
   const [billNo, setBillNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -49,7 +55,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     fetchAllBills();
     // Initialize with 1 empty row
     const initialRows = [{
-      id: Date.now(),
+      id: generateUniqueId(),
       productName: '',
       qty: 1,
       rate: 0,
@@ -101,7 +107,6 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
 
   const fetchCustomers = async () => {
     try {
-      console.log('Fetching customers from API...');
       const response = await fetch('http://localhost:5003/api/customers/list', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -219,7 +224,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
         setBillItems(items => items.filter(item => item.id !== itemId));
       }
       // Always add a new empty row and focus it
-      const nextRowId = Date.now();
+      const nextRowId = generateUniqueId();
       setBillItems(prevItems => {
         // Only add if last row is not empty
         const last = prevItems[prevItems.length - 1];
@@ -258,7 +263,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
         return item;
       }));
       // Add a new empty row and focus it after state update
-      nextRowId = Date.now();
+      nextRowId = generateUniqueId();
       setBillItems(prevItems => [...prevItems, {
         id: nextRowId,
         productName: '',
@@ -561,7 +566,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     
     // Transform bill items to match billItems format
     const transformedItems = bill.items.map(item => ({
-      id: item._id || Date.now(),
+      id: item._id || generateUniqueId(),
       productName: item.productId?.productName || item.productName || '',
       qty: item.qty,
       rate: item.rate,
@@ -624,7 +629,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       )
     : customers;
 
-  console.log('Total customers:', customers.length, 'Filtered:', filteredCustomers.length, 'Search:', customerSearch);
+  // Debug: console.log('Total customers:', customers.length, 'Filtered:', filteredCustomers.length, 'Search:', customerSearch);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex flex-col">
@@ -640,7 +645,6 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
             </div>
             <div>
               <h1 className="text-2xl font-bold drop-shadow-sm">SALES BILLING</h1>
-              <p className="text-blue-100 text-sm">Professional Invoice Management</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

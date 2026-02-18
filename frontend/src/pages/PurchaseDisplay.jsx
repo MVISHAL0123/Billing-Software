@@ -412,7 +412,6 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
           </div>
           <div>
             <h1 className="text-xl font-bold">PURCHASE DISPLAY</h1>
-            <p className="text-blue-100 text-sm">View and filter purchase records</p>
           </div>
         </div>
         <button
