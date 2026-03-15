@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const SalesReport = ({ user, onNavigateToDashboard }) => {
   const [sales, setSales] = useState([]);
@@ -70,7 +71,7 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
   const fetchSales = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5003/api/bills/list', {
+      const response = await fetch(`${API_BASE_URL}/bills/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -99,7 +100,7 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/customers/list', {
+      const response = await fetch(`${API_BASE_URL}/customers/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -115,7 +116,7 @@ const SalesReport = ({ user, onNavigateToDashboard }) => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

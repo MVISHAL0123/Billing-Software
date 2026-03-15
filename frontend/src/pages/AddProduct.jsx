@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { translateToTamil } from '../services/translationService';
+import { API_BASE_URL } from '../utils/constants';
 
 const AddProduct = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ const AddProduct = ({ user }) => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -161,9 +162,9 @@ const AddProduct = ({ user }) => {
     setLoading(true);
 
     try {
-      const url = editingProductId 
-        ? `http://localhost:5003/api/products/${editingProductId}`
-        : 'http://localhost:5003/api/products/add';
+      const url = editingProductId
+        ? `${API_BASE_URL}/products/${editingProductId}`
+        : `${API_BASE_URL}/products/add`;
       
       const response = await fetch(url, {
         method: editingProductId ? 'PUT' : 'POST',

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 // Unique ID generator to prevent key collisions
 let idCounter = 0;
@@ -27,6 +28,11 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   const productContainerRef = useRef(null);
   const [allBills, setAllBills] = useState([]);
   const [currentBillIndex, setCurrentBillIndex] = useState(-1);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState('');
+  const voiceRecognitionRef = useRef(null);
+  const voiceTranscriptRef = useRef('');
+  const voiceListeningRef = useRef(false);
 
   // Auto-scroll selected customer into view
   useEffect(() => {
@@ -83,7 +89,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   const generateBillNo = async () => {
     try {
       // Get the next bill number from the database
-      const response = await fetch('http://localhost:5003/api/bills/next-bill-number', {
+      const response = await fetch(`${API_BASE_URL}/bills/next-bill-number`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -107,7 +113,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/customers/list', {
+      const response = await fetch(`${API_BASE_URL}/customers/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -129,7 +135,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   const fetchProducts = async () => {
     try {
       console.log('Fetching products from API...');
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -151,7 +157,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   const fetchAllBills = async () => {
     try {
       console.log('Fetching all bills from API...');
-      const response = await fetch('http://localhost:5003/api/bills/list', {
+      const response = await fetch(`${API_BASE_URL}/bills/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -439,30 +445,24 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
   };
 
   const handleClear = () => {
-    showConfirmation(
-      'Are you sure you want to clear all data? This action cannot be undone.',
-      () => {
-        setBillItems([{
-          id: Date.now(),
-          productName: '',
-          qty: 1,
-          rate: 0,
-          purchaseRate: 0,
-          profitPerItem: 0,
-          amount: 0,
-          totalProfit: 0
-        }]);
-        setSelectedCustomerState(null);
-        setCustomerSearch('');
-        setCustomerSearchFocused(false);
-        setDate(new Date().toISOString().split('T')[0]);
-        generateBillNo();
-        setCurrentBillIndex(-1);
-        setSaveMessage('✅ Data cleared successfully!');
-        setTimeout(() => setSaveMessage(''), 2000);
-      },
-      'warning'
-    );
+    setBillItems([{
+      id: Date.now(),
+      productName: '',
+      qty: 1,
+      rate: 0,
+      purchaseRate: 0,
+      profitPerItem: 0,
+      amount: 0,
+      totalProfit: 0
+    }]);
+    setSelectedCustomerState(null);
+    setCustomerSearch('');
+    setCustomerSearchFocused(false);
+    setDate(new Date().toISOString().split('T')[0]);
+    generateBillNo();
+    setCurrentBillIndex(-1);
+    setSaveMessage('✅ Data cleared successfully!');
+    setTimeout(() => setSaveMessage(''), 2000);
   };
 
   const handleSave = async () => {
@@ -525,7 +525,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     };
 
     // Background save (non-blocking)
-    fetch('http://localhost:5003/api/bills/create', {
+    fetch(`${API_BASE_URL}/bills/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -631,6 +631,349 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
 
   // Debug: console.log('Total customers:', customers.length, 'Filtered:', filteredCustomers.length, 'Search:', customerSearch);
 
+  // Handle voice-detected items - add them to the bill
+  const handleVoiceItems = (voiceItems) => {
+    setBillItems(prevItems => {
+      const nonEmptyItems = prevItems.filter(item => item.productName && item.productName.trim() !== '');
+
+      const newItems = voiceItems.map(vItem => ({
+        id: generateUniqueId(),
+        productName: vItem.productName,
+        qty: vItem.qty,
+        rate: vItem.rate,
+        purchaseRate: vItem.purchaseRate || 0,
+        profitPerItem: vItem.profitPerItem || 0,
+        amount: vItem.amount,
+        totalProfit: vItem.totalProfit || 0
+      }));
+
+      const merged = [...nonEmptyItems];
+      for (const newItem of newItems) {
+        const existingIdx = merged.findIndex(item => item.productName === newItem.productName);
+        if (existingIdx !== -1) {
+          const existing = merged[existingIdx];
+          const newQty = existing.qty + newItem.qty;
+          merged[existingIdx] = {
+            ...existing,
+            qty: newQty,
+            amount: newQty * existing.rate,
+            totalProfit: newQty * existing.profitPerItem
+          };
+        } else {
+          merged.push(newItem);
+        }
+      }
+
+      merged.push({
+        id: generateUniqueId(),
+        productName: '',
+        qty: 1,
+        rate: 0,
+        purchaseRate: 0,
+        profitPerItem: 0,
+        amount: 0,
+        totalProfit: 0
+      });
+
+      return merged;
+    });
+  };
+
+  // Instant frontend-side product matching (no API call = fast)
+  const processVoiceTranscript = (text) => {
+    if (!text.trim()) return;
+    setVoiceStatus('Processing...');
+
+    const lowerText = text.toLowerCase();
+
+    // Detect save bill command
+    const saveCommands = ['save the bill', 'save bill', 'save it', 'bill save',
+      'save pannu', 'save pannunga', 'bill save pannu', 'confirm bill', 'confirm',
+      'done', 'finish', 'complete', 'submit'];
+    const isSaveCommand = saveCommands.some(cmd => lowerText.includes(cmd));
+
+    if (isSaveCommand) {
+      setVoiceStatus('Saving bill...');
+      handleSave();
+      setTimeout(() => setVoiceStatus(''), 2000);
+      return;
+    }
+
+    const words = lowerText.split(/[\s,\.]+/).filter(Boolean);
+
+    // Number word mapping (English + Tamil transliteration + Tamil script)
+    const numberMap = {
+      'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+      'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+      'oru': 1, 'rendu': 2, 'moonu': 3, 'naalu': 4, 'anju': 5,
+      'aaru': 6, 'ezhu': 7, 'ettu': 8, 'onbathu': 9, 'pathu': 10,
+      'half': 0.5, 'quarter': 0.25,
+      // Tamil script numbers
+      'ஒரு': 1, 'ஒன்று': 1, 'இரண்டு': 2, 'ரெண்டு': 2, 'மூன்று': 3,
+      'நான்கு': 4, 'ஐந்து': 5, 'ஆறு': 6, 'ஏழு': 7, 'எட்டு': 8,
+      'ஒன்பது': 9, 'பத்து': 10, 'அரை': 0.5, 'கால்': 0.25,
+    };
+
+    // Tamil product keyword mapping (transliteration + Tamil script)
+    const tamilMap = {
+      'arisi': 'rice', 'sakkarai': 'sugar', 'ennai': 'oil',
+      'paal': 'milk', 'atta': 'wheat', 'maavu': 'flour',
+      'uppu': 'salt', 'milagai': 'chilli', 'vengayam': 'onion',
+      'thakkali': 'tomato', 'paruppu': 'dal', 'thengai': 'coconut',
+      'kadalai': 'groundnut', 'ellu': 'sesame', 'manjal': 'turmeric',
+      // Tamil script mappings
+      'அரிசி': 'rice', 'சக்கரை': 'sugar', 'எண்ணெய்': 'oil',
+      'பால்': 'milk', 'ஆட்டா': 'wheat', 'மாவு': 'flour',
+      'உப்பு': 'salt', 'மிளகாய்': 'chilli', 'வெங்காயம்': 'onion',
+      'தக்காளி': 'tomato', 'பருப்பு': 'dal', 'தேங்காய்': 'coconut',
+      'கடலை': 'groundnut', 'எள்': 'sesame', 'மஞ்சள்': 'turmeric',
+      'சோப்': 'soap', 'டீ': 'tea', 'காப்பி': 'coffee',
+      'ரவா': 'rava', 'ரவை': 'rava', 'பிஸ்கட்': 'biscuit',
+      'நூடுல்ஸ்': 'noodles', 'எண்ணை': 'oil',
+    };
+
+    // Skip words (units, filler, trigger words - English + Tamil)
+    const skipWords = new Set(['kg', 'kilogram', 'kilograms', 'litre', 'litres', 'liter',
+      'packet', 'packets', 'piece', 'pieces', 'and', 'the', 'of', 'give', 'me',
+      'i', 'want', 'need', 'please', 'add', 'put', 'also', 'more', 'with', 'a',
+      'bill', 'to', 'for', 'customer', 'order', 'from', 'by', 'sir', 'madam', 'bro',
+      'anna', 'akka', 'uncle', 'aunty', 'shop', 'store', 'na', 'nu', 'la', 'ku',
+      // Tamil script skip words
+      'கிலோ', 'கேஜி', 'லிட்டர்', 'பாக்கெட்', 'தாங்க', 'வேணும்',
+      'கொடுங்க', 'போடுங்க', 'மற்றும்', 'உம்', 'ம்', 'பில்',
+      'க்கு', 'இந்த', 'அந்த', 'என்ன', 'எனக்கு', 'கொடு',
+    ]);
+
+    const items = [];
+    let currentQty = 0; // 0 means no qty spoken yet
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+
+      // Check number words
+      if (numberMap[word] !== undefined) {
+        currentQty = numberMap[word];
+        continue;
+      }
+
+      // Check numeric value
+      const num = parseFloat(word);
+      if (!isNaN(num) && num > 0) {
+        currentQty = num;
+        continue;
+      }
+
+      // Skip filler/unit words
+      if (skipWords.has(word)) continue;
+
+      // Translate Tamil word
+      const searchTerm = tamilMap[word] || word;
+
+      // Match product - check productName and tamilName
+      const product = products.find(p => {
+        const pName = (p.productName || '').toLowerCase();
+        const tName = (p.tamilName || '').toLowerCase();
+        return pName.includes(searchTerm) || tName.includes(word) ||
+               searchTerm.includes(pName.split(' ')[0]);
+      });
+
+      if (product) {
+        // If no qty before product, look ahead for qty after product
+        let qty = currentQty;
+        if (qty === 0) {
+          for (let j = i + 1; j < words.length; j++) {
+            const nextWord = words[j];
+            if (skipWords.has(nextWord)) continue;
+            if (numberMap[nextWord] !== undefined) {
+              qty = numberMap[nextWord];
+              i = j; // skip ahead
+              break;
+            }
+            const nextNum = parseFloat(nextWord);
+            if (!isNaN(nextNum) && nextNum > 0) {
+              qty = nextNum;
+              i = j; // skip ahead
+              break;
+            }
+            break; // next word is not a number/skip, stop looking
+          }
+        }
+        if (qty === 0) qty = 1; // default to 1 if no qty found at all
+
+        const existingIdx = items.findIndex(item => item.productName === product.productName);
+        if (existingIdx !== -1) {
+          items[existingIdx].qty += qty;
+          items[existingIdx].amount = items[existingIdx].qty * product.salesRate;
+          items[existingIdx].totalProfit = items[existingIdx].qty * (product.salesRate - product.purchaseRate);
+        } else {
+          items.push({
+            productName: product.productName,
+            qty: qty,
+            rate: product.salesRate,
+            purchaseRate: product.purchaseRate,
+            profitPerItem: product.salesRate - product.purchaseRate,
+            amount: qty * product.salesRate,
+            totalProfit: qty * (product.salesRate - product.purchaseRate)
+          });
+        }
+        currentQty = 0; // reset for next product
+      }
+    }
+
+    // --- Customer name detection ---
+    // Try matching full customer name first (multi-word), then single word
+    let matchedCustomer = null;
+
+    // Sort by name length descending so longer names match first (e.g. "Raman Kumar" before "Raman")
+    const sortedCustomers = [...customers].sort(
+      (a, b) => (b.customerName || '').length - (a.customerName || '').length
+    );
+
+    for (const c of sortedCustomers) {
+      const cName = (c.customerName || '').toLowerCase();
+      if (cName && lowerText.includes(cName)) {
+        matchedCustomer = c;
+        break;
+      }
+    }
+
+    // If no full-name match, try matching any single word from transcript against customer names
+    if (!matchedCustomer) {
+      for (const word of words) {
+        if (skipWords.has(word) || numberMap[word] !== undefined || !isNaN(parseFloat(word))) continue;
+        // Skip if word matched a product already
+        const isProduct = items.some(item => item.productName.toLowerCase().includes(word));
+        if (isProduct) continue;
+
+        const found = customers.find(c => {
+          const cName = (c.customerName || '').toLowerCase();
+          return cName.split(/\s+/).some(part => part === word && word.length >= 3);
+        });
+        if (found) {
+          matchedCustomer = found;
+          break;
+        }
+      }
+    }
+
+    if (matchedCustomer) {
+      handleCustomerSelect(matchedCustomer);
+    }
+
+    // --- Status update ---
+    const statusParts = [];
+    if (items.length > 0) {
+      handleVoiceItems(items);
+      statusParts.push(`Added ${items.length} item(s)`);
+    }
+    if (matchedCustomer) {
+      statusParts.push(`Customer: ${matchedCustomer.customerName}`);
+    }
+
+    if (statusParts.length > 0) {
+      setVoiceStatus(statusParts.join(' | '));
+    } else {
+      setVoiceStatus('No products/customer found');
+    }
+    setTimeout(() => setVoiceStatus(''), 4000);
+  };
+
+  // Toggle mic - start/stop speech recognition directly
+  const toggleVoiceMic = () => {
+    if (voiceListeningRef.current) {
+      // Stop listening
+      voiceListeningRef.current = false;
+      setVoiceListening(false);
+      setVoiceStatus('Processing...');
+
+      if (voiceRecognitionRef.current) {
+        // Set onend to process after recognition fully stops and flushes results
+        voiceRecognitionRef.current.onend = () => {
+          const transcript = voiceTranscriptRef.current;
+          voiceTranscriptRef.current = '';
+          voiceRecognitionRef.current = null;
+          if (transcript.trim()) {
+            processVoiceTranscript(transcript);
+          } else {
+            setVoiceStatus('No speech detected');
+            setTimeout(() => setVoiceStatus(''), 2000);
+          }
+        };
+        voiceRecognitionRef.current.stop();
+      } else {
+        setVoiceStatus('No speech detected');
+        setTimeout(() => setVoiceStatus(''), 2000);
+      }
+    } else {
+      // Start listening
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        setVoiceStatus('Browser not supported. Use Chrome.');
+        setTimeout(() => setVoiceStatus(''), 3000);
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-IN';
+      recognition.maxAlternatives = 1;
+
+      voiceTranscriptRef.current = '';
+
+      recognition.onresult = (event) => {
+        let finalText = '';
+        let interimText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const text = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += text + ' ';
+          } else {
+            interimText += text;
+          }
+        }
+        if (finalText) {
+          voiceTranscriptRef.current += finalText;
+          setVoiceStatus('Heard: ' + voiceTranscriptRef.current.trim());
+        } else if (interimText) {
+          setVoiceStatus('Hearing: ' + interimText);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech error:', event.error);
+        if (event.error === 'no-speech') {
+          // Don't stop on no-speech, just keep listening
+          return;
+        }
+        voiceListeningRef.current = false;
+        setVoiceListening(false);
+        setVoiceStatus(`Error: ${event.error}`);
+        setTimeout(() => setVoiceStatus(''), 3000);
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if still in listening mode (uses ref to avoid stale closure)
+        if (voiceListeningRef.current) {
+          try { recognition.start(); } catch (e) {
+            voiceListeningRef.current = false;
+            setVoiceListening(false);
+          }
+        }
+      };
+
+      voiceRecognitionRef.current = recognition;
+      try {
+        recognition.start();
+        voiceListeningRef.current = true;
+        setVoiceListening(true);
+        setVoiceStatus('Listening... speak now');
+      } catch (e) {
+        setVoiceStatus('Failed to start mic');
+        setTimeout(() => setVoiceStatus(''), 2000);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col relative">
@@ -688,6 +1031,60 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                       className="px-3 py-1 border border-blue-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none shadow-inner bg-blue-50 text-blue-700 font-semibold"
                     />
                   </div>
+                  {/* Voice Mic Button - Direct */}
+                  <button
+                    onClick={toggleVoiceMic}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md border transition-all duration-200 ${
+                      voiceListening
+                        ? 'bg-red-500 text-white border-red-500 animate-pulse shadow-red-200'
+                        : 'bg-white text-purple-700 border-purple-300 hover:bg-purple-50 hover:border-purple-400'
+                    }`}
+                    title={voiceListening ? 'Stop & Add to Bill' : 'Start Voice Billing'}
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                    {voiceListening ? 'Stop' : 'Mic'}
+                  </button>
+                  {voiceStatus && (
+                    <span className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border shadow-sm max-w-md truncate ${
+                      voiceStatus.includes('Hearing')
+                        ? 'bg-orange-50 text-orange-600 border-orange-300'
+                        : voiceStatus.includes('Heard')
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
+                          : voiceStatus.includes('Listening')
+                            ? 'bg-red-50 text-red-600 border-red-300 animate-pulse'
+                            : voiceStatus.includes('Processing')
+                              ? 'bg-yellow-50 text-yellow-700 border-yellow-300 animate-pulse'
+                              : voiceStatus.includes('Added')
+                                ? 'bg-green-50 text-green-700 border-green-300'
+                                : voiceStatus.includes('Error') || voiceStatus.includes('No ')
+                                  ? 'bg-red-50 text-red-600 border-red-300'
+                                  : 'bg-purple-50 text-purple-600 border-purple-200'
+                    }`}>
+                      {(voiceStatus.includes('Listening') || voiceStatus.includes('Hearing')) && (
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-ping flex-shrink-0"></span>
+                      )}
+                      {voiceStatus.includes('Heard') && !voiceStatus.includes('Hearing') && (
+                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-2a5 5 0 01-10 0H3a7.001 7.001 0 006 6.93V18H6v2h8v-2h-3v-3.07z" clipRule="evenodd"/>
+                        </svg>
+                      )}
+                      {voiceStatus.includes('Processing') && (
+                        <svg className="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      )}
+                      {voiceStatus.includes('Added') && (
+                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                        </svg>
+                      )}
+                      {voiceStatus}
+                    </span>
+                  )}
                 </div>
 
                 {/* Customer Search */}
@@ -971,12 +1368,12 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
                     <span className="font-bold text-blue-900 text-lg">₹{calculateSubtotal().toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between pb-0  border-b-2 border-blue-200">
-                    <span className="font-bold text-blue-800">Total:</span>
-                    <span className="font-bold text-blue-900 text-lg">₹{calculateTotal().toFixed(2)}</span>
+                    <span className="font-bold text-blue-800">Round Off:</span>
+                    <span className="font-bold text-blue-900 text-lg">{(Math.round(calculateTotal()) - calculateTotal()) >= 0 ? '+' : ''}₹{(Math.round(calculateTotal()) - calculateTotal()).toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between pt-1 bg-blue-50 rounded-lg p-1 border border-blue-300">
                     <span className="text-lg font-bold text-blue-800">Total Amount:</span>
-                    <span className="text-xl font-bold text-blue-600">₹{calculateTotal().toFixed(2)}</span>
+                    <span className="text-xl font-bold text-blue-600">₹{Math.round(calculateTotal()).toFixed(2)}</span>
                   </div>
                 </div>
                 

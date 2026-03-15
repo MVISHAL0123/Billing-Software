@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const Purchase = ({ onNavigateToDashboard }) => {
   const [billNo, setBillNo] = useState('');
@@ -42,7 +43,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
   const generateGrnNo = async () => {
     try {
       // Get the next GRN number from the database
-      const response = await fetch('http://localhost:5003/api/purchases/next-grn-number', {
+      const response = await fetch(`${API_BASE_URL}/purchases/next-grn-number`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -67,7 +68,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
   const fetchSuppliers = async () => {
     try {
       console.log('Fetching suppliers from API...');
-      const response = await fetch('http://localhost:5003/api/suppliers/list', {
+      const response = await fetch(`${API_BASE_URL}/suppliers/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -91,7 +92,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
   const fetchProducts = async () => {
     try {
       console.log('Fetching products from API...');
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -113,7 +114,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
   const fetchAllPurchases = async () => {
     try {
       console.log('Fetching all purchases from API...');
-      const response = await fetch('http://localhost:5003/api/purchases/list', {
+      const response = await fetch(`${API_BASE_URL}/purchases/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -518,7 +519,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
     };
 
     // Save in background without blocking UI
-    fetch('http://localhost:5003/api/purchases/create', {
+    fetch(`${API_BASE_URL}/purchases/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

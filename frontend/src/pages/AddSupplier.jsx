@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const AddSupplier = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -20,7 +21,7 @@ const AddSupplier = ({ user }) => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/suppliers/list', {
+      const response = await fetch(`${API_BASE_URL}/suppliers/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -94,9 +95,9 @@ const AddSupplier = ({ user }) => {
     setLoading(true);
 
     try {
-      const url = editingSupplierId 
-        ? `http://localhost:5003/api/suppliers/${editingSupplierId}`
-        : 'http://localhost:5003/api/suppliers/add';
+      const url = editingSupplierId
+        ? `${API_BASE_URL}/suppliers/${editingSupplierId}`
+        : `${API_BASE_URL}/suppliers/add`;
       
       const response = await fetch(url, {
         method: editingSupplierId ? 'PUT' : 'POST',

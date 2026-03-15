@@ -8,6 +8,7 @@ import supplierRoutes from './routes/supplierRoutes.js';
 import billRoutes from './routes/billRoutes.js';
 import purchaseRoutes from './routes/purchaseRoutes.js';
 import translationRoutes from './routes/translationRoutes.js';
+import voiceRoutes from './routes/voiceRoutes.js';
 import { initializeFirebase } from '../config/database.js';
 import { seedUsers } from './utils/seedUsers.js';
 
@@ -43,6 +44,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/translation', translationRoutes);
+app.use('/api/voice', voiceRoutes);
 
 // Start server
 app.listen(PORT, () => {

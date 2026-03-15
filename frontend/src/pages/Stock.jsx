@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import stockAnalysisService from '../services/stockAnalysisService';
+import { API_BASE_URL } from '../utils/constants';
 
 const Stock = ({ onNavigateToDashboard }) => {
   const [products, setProducts] = useState([]);
@@ -35,7 +36,7 @@ const Stock = ({ onNavigateToDashboard }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

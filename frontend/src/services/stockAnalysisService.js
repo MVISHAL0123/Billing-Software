@@ -1,4 +1,6 @@
 // Stock Analysis Service - Analyzes stock data and generates alerts
+import { API_BASE_URL } from '../utils/constants';
+
 class StockAnalysisService {
   constructor() {
     this.cache = {
@@ -12,7 +14,7 @@ class StockAnalysisService {
   // Fetch products from API
   async fetchProducts() {
     try {
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

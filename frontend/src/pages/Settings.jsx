@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const Settings = ({ user, onUpdateUser }) => {
   const [formData, setFormData] = useState({
@@ -22,7 +23,7 @@ const Settings = ({ user, onUpdateUser }) => {
 
   const fetchStaffUsers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/auth/staff-users', {
+      const response = await fetch(`${API_BASE_URL}/auth/staff-users`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -68,7 +69,7 @@ const Settings = ({ user, onUpdateUser }) => {
         return;
       }
 
-      const response = await fetch('http://localhost:5003/api/auth/update-staff', {
+      const response = await fetch(`${API_BASE_URL}/auth/update-staff`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ const Settings = ({ user, onUpdateUser }) => {
         updateData.newPassword = formData.newPassword;
       }
 
-      const response = await fetch('http://localhost:5003/api/auth/update-profile', {
+      const response = await fetch(`${API_BASE_URL}/auth/update-profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

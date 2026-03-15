@@ -1,4 +1,6 @@
 // Product update service for refreshing data across pages
+import { API_BASE_URL } from '../utils/constants';
+
 class ProductUpdateService {
   constructor() {
     this.listeners = [];
@@ -31,7 +33,7 @@ class ProductUpdateService {
   // Update product prices
   async updateProductPrices(productId, priceData) {
     try {
-      const response = await fetch('http://localhost:5003/api/products/prices/update', {
+      const response = await fetch(`${API_BASE_URL}/products/prices/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +64,7 @@ class ProductUpdateService {
   // Refresh product data across all pages
   async refreshAllProducts() {
     try {
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

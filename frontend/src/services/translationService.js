@@ -1,5 +1,7 @@
 // Frontend Translation Service
-const API_URL = 'http://localhost:5003/api/translation';
+import { API_BASE_URL } from '../utils/constants';
+
+const API_URL = `${API_BASE_URL}/translation`;
 
 export const translateToTamil = async (text) => {
   if (!text || !text.trim()) return '';

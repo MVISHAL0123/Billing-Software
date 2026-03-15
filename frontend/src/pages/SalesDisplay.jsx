@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustomer }) => {
   const [sales, setSales] = useState([]);
@@ -78,7 +79,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
       setLoading(true);
     }
     try {
-      const response = await fetch('http://localhost:5003/api/bills/list', {
+      const response = await fetch(`${API_BASE_URL}/bills/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -109,7 +110,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/customers/list', {
+      const response = await fetch(`${API_BASE_URL}/customers/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -130,7 +131,7 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:5003/api/products/list', {
+      const response = await fetch(`${API_BASE_URL}/products/list`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
