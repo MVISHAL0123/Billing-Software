@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../utils/constants';
+import { getCurrentBusinessDate, getDateString } from '../utils/businessDateUtils';
 
 // Unique ID generator to prevent key collisions
 let idCounter = 0;
@@ -9,7 +10,7 @@ const generateUniqueId = () => {
 
 const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) => {
   const [billNo, setBillNo] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getDateString());
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [billItems, setBillItems] = useState([]);
@@ -71,6 +72,25 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       totalProfit: 0
     }];
     setBillItems(initialRows);
+
+    // Auto-refresh products every 5 seconds to show updated stock
+    const productIntervalId = setInterval(() => {
+      fetchProducts();
+    }, 5000);
+
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(productIntervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -491,8 +511,6 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     const totalSales = calculateTotal();
 
     // Clear form immediately for instant response
-    const newBillNo = (parseInt(billNo) + 1).toString();
-    setBillNo(newBillNo);
     setBillItems([{
       id: Date.now(),
       productName: '',
@@ -536,9 +554,12 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Update bill number from server if provided
+        // Get next bill number from API response
         if (data.nextBillNo) {
           setBillNo(data.nextBillNo.toString());
+        } else {
+          // Fallback: fetch next bill number if not in response
+          generateBillNo();
         }
         // Update bills list in background
         fetchAllBills().catch(console.error);

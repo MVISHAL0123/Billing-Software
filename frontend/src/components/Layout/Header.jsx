@@ -11,6 +11,17 @@ const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, o
   const salesRef = useRef(null);
   const purchaseRef = useRef(null);
 
+  // State for header color change on scroll
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -39,7 +50,7 @@ const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, o
 
   return (
     <>
-    <header className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-2xl">
+    <header className={`header-animated transition-colors duration-500 shadow-2xl ${scrolled ? 'bg-blue-900/95' : 'bg-gradient-to-r from-blue-600 to-blue-800'}`}> 
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -517,6 +528,18 @@ const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, o
       .logout-smooth:hover {
         transform: translateY(-1px) scale(1.02);
         box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+      }
+      .header-animated {
+        transition: background 0.5s cubic-bezier(0.4,0,0.2,1), background-color 0.5s cubic-bezier(0.4,0,0.2,1);
+        will-change: background, background-color;
+      }
+      .header-animated.bg-blue-900\/95 {
+        background: rgba(30, 41, 59, 0.95) !important;
+        /* fallback for browsers that don't support backdrop-filter */
+        backdrop-filter: blur(4px);
+      }
+      .header-animated.bg-gradient-to-r {
+        background: linear-gradient(to right, #2563eb, #1e40af) !important;
       }
     `}</style>
     </>

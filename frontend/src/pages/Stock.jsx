@@ -15,6 +15,27 @@ const Stock = ({ onNavigateToDashboard }) => {
   useEffect(() => {
     fetchProducts();
     loadStockAnalysis();
+
+    // Auto-refresh stock data every 3 seconds
+    const intervalId = setInterval(() => {
+      fetchProducts();
+      loadStockAnalysis();
+    }, 3000);
+
+    // Also refresh when tab becomes visible (user comes back from another tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProducts();
+        loadStockAnalysis();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const loadStockAnalysis = async () => {

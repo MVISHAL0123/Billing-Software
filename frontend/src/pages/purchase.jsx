@@ -38,6 +38,25 @@ const Purchase = ({ onNavigateToDashboard }) => {
       amount: 0
     }];
     setBillItems(initialRows);
+
+    // Auto-refresh products every 5 seconds to show updated stock
+    const productIntervalId = setInterval(() => {
+      fetchProducts();
+    }, 5000);
+
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(productIntervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const generateGrnNo = async () => {

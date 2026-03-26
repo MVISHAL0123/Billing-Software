@@ -21,6 +21,23 @@ function App() {
   const [user, setUser] = useState(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedCustomerForSales, setSelectedCustomerForSales] = useState(null);
+  const [currentBusinessDate, setCurrentBusinessDate] = useState(null);
+
+  // Initialize business date from localStorage
+  useEffect(() => {
+    const storedDate = localStorage.getItem('businessDate');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (storedDate) {
+      const stored = new Date(storedDate);
+      stored.setHours(0, 0, 0, 0);
+      setCurrentBusinessDate(stored);
+    } else {
+      setCurrentBusinessDate(today);
+      localStorage.setItem('businessDate', today.toISOString());
+    }
+  }, []);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -36,6 +53,8 @@ function App() {
     setIsLoggedIn(true);
     setCurrentPage('dashboard');
   };
+
+
 
   const handleLogout = () => {
     authService.logout();
@@ -104,6 +123,7 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+
       {currentPage !== 'sales' && currentPage !== 'salesDisplay' && currentPage !== 'salesReport' && currentPage !== 'purchase' && currentPage !== 'purchaseDisplay' && currentPage !== 'stock' && (
         <Header 
           user={user} 

@@ -54,7 +54,7 @@ export const createPurchase = async (req, res) => {
         // Find the product by name (case-insensitive search using Firebase)
         const products = await Product.findAll();
         let product = products.find(p => 
-          p.productName.toLowerCase() === item.productName.toLowerCase()
+          p.productName.toLowerCase().trim() === item.productName.toLowerCase().trim()
         );
 
         if (product) {

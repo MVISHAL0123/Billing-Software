@@ -60,7 +60,7 @@ export const createBill = async (req, res) => {
         // Find the product by name (case-insensitive search using Firebase)
         const products = await Product.findAll();
         let product = products.find(p => 
-          p.productName.toLowerCase() === item.productName.toLowerCase()
+          p.productName.toLowerCase().trim() === item.productName.toLowerCase().trim()
         );
 
         if (product) {
@@ -210,10 +210,13 @@ export const deleteBill = async (req, res) => {
 export const deleteAllBills = async (req, res) => {
   try {
     const deletedCount = await Bill.deleteAllBills();
+    
+    // Reset bill counter to 0 (so next bill will be 1)
+    await firebaseService.resetBillCounter();
 
     res.json({
       success: true,
-      message: `Deleted ${deletedCount} bills successfully`,
+      message: `Deleted ${deletedCount} bills and reset bill counter to 1`,
       deletedCount: deletedCount
     });
   } catch (error) {

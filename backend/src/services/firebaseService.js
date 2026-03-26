@@ -172,6 +172,13 @@ class FirebaseService {
     return this.getNextBillNumber();
   }
 
+  // Reset bill counter to 0 (next bill will be 1)
+  async resetBillCounter() {
+    const counterRef = this.db.collection('counters').doc('billNumber');
+    await counterRef.set({ value: 0 });
+    return true;
+  }
+
   // Get next GRN number WITHOUT incrementing (for preview/display)
   async getNextGRNNumber() {
     const counterRef = this.db.collection('counters').doc('grnNumber');
