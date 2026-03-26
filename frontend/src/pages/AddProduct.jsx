@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { translateToTamil } from '../services/translationService';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const AddProduct = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -28,23 +28,13 @@ const AddProduct = ({ user }) => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
+      // Fetch from Firestore
+      const data = await firestoreService.getProducts();
       
-      // Handle authentication errors
-      if (!response.ok && (response.status === 401 || data.message?.includes('Token'))) {
-        localStorage.clear();
-        alert('Session expired. Please login again.');
-        window.location.reload();
-        return;
-      }
-      
-      if (data.success) {
-        setProducts(data.products);
+      if (data && data.length > 0) {
+        setProducts(data);
+      } else {
+        setProducts([]);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -162,41 +152,40 @@ const AddProduct = ({ user }) => {
     setLoading(true);
 
     try {
-      const url = editingProductId
-        ? `${API_BASE_URL}/products/${editingProductId}`
-        : `${API_BASE_URL}/products/add`;
+      let result;
       
-      const response = await fetch(url, {
-        method: editingProductId ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // If token is invalid, clear localStorage and reload
-        if (response.status === 401 || data.message?.includes('Token')) {
-          localStorage.clear();
-          alert('Session expired. Please login again.');
-          window.location.reload();
-          return;
-        }
-        throw new Error(data.message || (editingProductId ? 'Failed to update product' : 'Failed to add product'));
+      if (editingProductId) {
+        // Update existing product in Firestore
+        result = await firestoreService.updateProduct(editingProductId, {
+          ...formData,
+          purchaseRate: parseFloat(formData.purchaseRate),
+          salesRate: parseFloat(formData.salesRate),
+          marginPercentage: parseFloat(formData.marginPercentage)
+        });
+      } else {
+        // Add new product to Firestore
+        result = await firestoreService.addProduct({
+          ...formData,
+          purchaseRate: parseFloat(formData.purchaseRate),
+          salesRate: parseFloat(formData.salesRate),
+          marginPercentage: parseFloat(formData.marginPercentage),
+          quantity: 0
+        });
       }
 
-      setMessage({ type: 'success', text: editingProductId ? 'Product updated successfully!' : 'Product added successfully!' });
-      
-      // Refresh products list
-      fetchProducts();
-      
-      // Clear form
-      handleClear();
+      if (result.success) {
+        setMessage({ type: 'success', text: editingProductId ? 'Product updated successfully!' : 'Product added successfully!' });
+        
+        // Refresh products list
+        fetchProducts();
+        
+        // Clear form
+        handleClear();
+      } else {
+        throw new Error(result.message || (editingProductId ? 'Failed to update product' : 'Failed to add product'));
+      }
     } catch (error) {
-      setMessage({ type: 'error', text: error.message || 'Failed to add product' });
+      setMessage({ type: 'error', text: error.message || 'Failed to save product' });
     } finally {
       setLoading(false);
     }

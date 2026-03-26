@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import stockAnalysisService from '../services/stockAnalysisService';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const Stock = ({ onNavigateToDashboard }) => {
   const [products, setProducts] = useState([]);
@@ -57,37 +57,20 @@ const Stock = ({ onNavigateToDashboard }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
       
-      if (data.success) {
-        setProducts(data.products || []);
+      // Fetch from Firestore instead of API
+      const data = await firestoreService.getProducts();
+      
+      if (data && data.length > 0) {
+        setProducts(data);
       } else {
-        console.error('Failed to fetch products:', data.message);
-        
-        // Handle specific Firebase error
-        if (data.error === 'FIREBASE_NOT_CONFIGURED') {
-          setError({
-            type: 'FIREBASE_ERROR',
-            message: 'Database not configured. Please set up Firebase to view stock data.'
-          });
-        } else {
-          setError({
-            type: 'API_ERROR', 
-            message: data.message || 'Failed to load products'
-          });
-        }
         setProducts([]);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Failed to fetch products:', error);
       setError({
-        type: 'NETWORK_ERROR',
-        message: 'Unable to connect to server. Please check if the backend is running.'
+        type: 'FIREBASE_ERROR',
+        message: 'Failed to load products from database'
       });
       setProducts([]);
     } finally {
