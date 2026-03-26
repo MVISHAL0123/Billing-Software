@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "mmk-billing-system",
+    "site": "mmkbills",
     "public": "frontend/dist",
     "ignore": [
       "firebase.json",
