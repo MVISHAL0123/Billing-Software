@@ -1,10 +1,27 @@
 import { auth, db } from '../config/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, setDoc, doc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, query, where, getDocs, setDoc, doc, getDoc } from 'firebase/firestore';
+
+// Demo user for testing
+const DEMO_USER = {
+  uid: 'demo-user-123',
+  email: 'demo@mmk.com',
+  name: 'Demo Admin',
+  role: 'admin',
+  username: 'demo',
+  token: 'demo-token-123'
+};
 
 export const authService = {
   login: async (username, password, role) => {
     try {
+      // Demo login (for testing without backend)
+      if (username.toLowerCase() === 'demo' && password === 'demo123') {
+        localStorage.setItem('user', JSON.stringify(DEMO_USER));
+        localStorage.setItem('token', DEMO_USER.token);
+        return { success: true, user: DEMO_USER };
+      }
+
       // Try logging in with email
       let email = username;
       
@@ -15,7 +32,10 @@ export const authService = {
         const querySnapshot = await getDocs(q);
         
         if (querySnapshot.empty) {
-          return { success: false, message: 'User not found' };
+          return { 
+            success: false, 
+            message: 'User not found. Try: demo / demo123' 
+          };
         }
         
         const userData = querySnapshot.docs[0].data();
@@ -26,8 +46,8 @@ export const authService = {
       const user = userCredential.user;
 
       // Get user details from Firestore
-      const userDoc = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
-      const userData = userDoc.docs[0]?.data() || {};
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
 
       const userObj = {
         uid: user.uid,
@@ -43,8 +63,21 @@ export const authService = {
       
       return { success: true, user: userObj };
     } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, message: error.message || 'Failed to login' };
+      console.error('Login error:', error.code, error.message);
+      
+      // User-friendly error messages
+      let message = 'Failed to login';
+      if (error.code === 'auth/user-not-found') {
+        message = 'Email not found. Try: demo@mmk.com';
+      } else if (error.code === 'auth/wrong-password') {
+        message = 'Wrong password';
+      } else if (error.code === 'auth/invalid-email') {
+        message = 'Invalid email address';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Too many login attempts. Try again later.';
+      }
+      
+      return { success: false, message };
     }
   },
 

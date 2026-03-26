@@ -138,6 +138,13 @@ const Login = ({ onLogin }) => {
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
+
+          {/* Demo Credentials Help */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-blue-600 mb-2">Demo Credentials:</p>
+            <p className="text-xs text-blue-700 font-mono">Username: <span className="font-bold">demo</span></p>
+            <p className="text-xs text-blue-700 font-mono">Password: <span className="font-bold">demo123</span></p>
+          </div>
           </form>
         </div>
       </div>
