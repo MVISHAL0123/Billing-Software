@@ -1,5 +1,5 @@
 import { auth, db } from '../config/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInAnonymously } from 'firebase/auth';
 import { collection, query, where, getDocs, setDoc, doc, getDoc } from 'firebase/firestore';
 
 // Demo user for testing
@@ -17,8 +17,16 @@ export const authService = {
     try {
       // Demo login (for testing without backend)
       if (username.toLowerCase() === 'demo' && password === 'demo123') {
+        // Sign in anonymously to get Firestore permission
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.warn('Could not sign in anonymously:', e);
+        }
+        
         localStorage.setItem('user', JSON.stringify(DEMO_USER));
         localStorage.setItem('token', DEMO_USER.token);
+        localStorage.setItem('isDemo', 'true');
         return { success: true, user: DEMO_USER };
       }
 
@@ -60,6 +68,7 @@ export const authService = {
 
       localStorage.setItem('user', JSON.stringify(userObj));
       localStorage.setItem('token', userObj.token);
+      localStorage.setItem('isDemo', 'false');
       
       return { success: true, user: userObj };
     } catch (error) {
