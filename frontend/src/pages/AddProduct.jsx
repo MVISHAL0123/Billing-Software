@@ -28,8 +28,10 @@ const AddProduct = ({ user }) => {
 
   const fetchProducts = async () => {
     try {
+      console.log('AddProduct: Fetching products from Firestore...');
       // Fetch from Firestore
       const data = await firestoreService.getProducts();
+      console.log('AddProduct: Got products:', data);
       
       if (data && data.length > 0) {
         setProducts(data);
@@ -37,7 +39,7 @@ const AddProduct = ({ user }) => {
         setProducts([]);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('AddProduct: Error fetching products:', error);
     }
   };
 

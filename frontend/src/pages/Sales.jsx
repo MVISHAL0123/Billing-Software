@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 import { getCurrentBusinessDate, getDateString } from '../utils/businessDateUtils';
 
 // Unique ID generator to prevent key collisions
@@ -108,24 +108,17 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
 
   const generateBillNo = async () => {
     try {
-      // Get the next bill number from the database
-      const response = await fetch(`${API_BASE_URL}/bills/next-bill-number`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      if (data.success && data.nextBillNo) {
-        setBillNo(data.nextBillNo.toString());
-      } else {
-        console.error('Error getting bill number:', data.message);
-        // Start from 1 if error
-        setBillNo('1');
-      }
-      
+      console.log('Sales: Generating bill number...');
+      // Get all bills and use the max bill number + 1
+      const allBillsData = await firestoreService.getBills();
+      const billNumbers = allBillsData
+        .map(b => parseInt(b.billNo || 0))
+        .filter(n => !isNaN(n));
+      const nextBillNo = Math.max(...billNumbers, 0) + 1;
+      console.log('Sales: Next bill number:', nextBillNo);
+      setBillNo(nextBillNo.toString());
     } catch (error) {
-      console.error('Error generating bill number:', error);
+      console.error('Sales: Error generating bill number:', error);
       // Start from 1 if error
       setBillNo('1');
     }
@@ -133,65 +126,35 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/customers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Response status:', response.status);
-      const data = await response.json();
-      console.log('API Response:', data);
-      if (data.success) {
-        setCustomers(data.customers);
-        console.log('Customers loaded:', data.customers.length, 'customers:', data.customers);
-      } else {
-        console.error('Failed to fetch customers:', data.message);
-      }
+      console.log('Sales: Fetching customers from Firestore...');
+      const data = await firestoreService.getCustomers();
+      console.log('Sales: Customers loaded:', data.length, 'customers');
+      setCustomers(data || []);
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error('Sales: Error fetching customers:', error);
     }
   };
 
   const fetchProducts = async () => {
     try {
-      console.log('Fetching products from API...');
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Products response status:', response.status);
-      const data = await response.json();
-      console.log('Products API Response:', data);
-      if (data.success) {
-        setProducts(data.products);
-        console.log('Products loaded:', data.products.length, 'products:', data.products);
-      } else {
-        console.error('Failed to fetch products:', data.message);
-      }
+      console.log('Sales: Fetching products from Firestore...');
+      const data = await firestoreService.getProducts();
+      console.log('Sales: Products loaded:', data.length, 'products');
+      setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Sales: Error fetching products:', error);
     }
   };
 
   const fetchAllBills = async () => {
     try {
-      console.log('Fetching all bills from API...');
-      const response = await fetch(`${API_BASE_URL}/bills/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      if (data.success) {
-        const sortedBills = (data.bills || []).sort((a, b) => parseInt(a.billNo) - parseInt(b.billNo));
-        setAllBills(sortedBills);
-        console.log('All bills loaded:', sortedBills.length, 'bills');
-      } else {
-        console.error('Failed to fetch bills:', data.message);
-      }
+      console.log('Sales: Fetching all bills from Firestore...');
+      const data = await firestoreService.getBills();
+      const sortedBills = (data || []).sort((a, b) => parseInt(a.billNo) - parseInt(b.billNo));
+      setAllBills(sortedBills);
+      console.log('Sales: All bills loaded:', sortedBills.length, 'bills');
     } catch (error) {
-      console.error('Error fetching bills:', error);
+      console.error('Sales: Error fetching bills:', error);
     }
   };
 
@@ -542,25 +505,13 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       marginPercentage: totalSales > 0 ? ((totalProfit / (totalSales - totalProfit)) * 100).toFixed(2) : 0
     };
 
-    // Background save (non-blocking)
-    fetch(`${API_BASE_URL}/bills/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(billData)
-    })
-    .then(response => response.json())
+    // Background save to Firestore (non-blocking)
+    firestoreService.addBill(billData)
     .then(data => {
       if (data.success) {
-        // Get next bill number from API response
-        if (data.nextBillNo) {
-          setBillNo(data.nextBillNo.toString());
-        } else {
-          // Fallback: fetch next bill number if not in response
-          generateBillNo();
-        }
+        console.log('Sales: Bill saved successfully:', data.id);
+        // Get next bill number
+        generateBillNo();
         // Update bills list in background
         fetchAllBills().catch(console.error);
       } else {
@@ -570,7 +521,7 @@ const Sales = ({ onNavigateToDashboard, selectedCustomer, onCustomerSelected }) 
       }
     })
     .catch(error => {
-      console.error('Save error:', error);
+      console.error('Sales: Save error:', error);
       setSaveMessage('❌ Save failed - check connection');
       setTimeout(() => setSaveMessage(''), 3000);
     });

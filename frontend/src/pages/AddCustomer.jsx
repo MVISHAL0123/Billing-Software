@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const AddCustomer = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -21,26 +21,16 @@ const AddCustomer = ({ user }) => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/customers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      // Handle authentication errors
-      if (!response.ok && (response.status === 401 || data.message?.includes('Token'))) {
-        localStorage.clear();
-        alert('Session expired. Please login again.');
-        window.location.reload();
-        return;
-      }
-      
-      if (data.success) {
-        setCustomers(data.customers);
+      console.log('AddCustomer: Fetching customers from Firestore...');
+      const data = await firestoreService.getCustomers();
+      console.log('AddCustomer: Got customers:', data);
+      if (data && data.length > 0) {
+        setCustomers(data);
+      } else {
+        setCustomers([]);
       }
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error('AddCustomer: Error fetching customers:', error);
     }
   };
 
@@ -91,30 +81,14 @@ const AddCustomer = ({ user }) => {
     setLoading(true);
 
     try {
-      const url = editingCustomerId
-        ? `${API_BASE_URL}/customers/${editingCustomerId}`
-        : `${API_BASE_URL}/customers/add`;
+      console.log('AddCustomer: Saving to Firestore...', editingCustomerId ? 'update' : 'create');
       
-      const response = await fetch(url, {
-        method: editingCustomerId ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // If token is invalid, clear localStorage and reload
-        if (response.status === 401 || data.message?.includes('Token')) {
-          localStorage.clear();
-          alert('Session expired. Please login again.');
-          window.location.reload();
-          return;
-        }
-        throw new Error(data.message || (editingCustomerId ? 'Failed to update customer' : 'Failed to add customer'));
+      if (editingCustomerId) {
+        // Update existing customer
+        await firestoreService.updateCustomer(editingCustomerId, formData);
+      } else {
+        // Add new customer
+        await firestoreService.addCustomer(formData);
       }
 
       setMessage({ type: 'success', text: editingCustomerId ? 'Customer updated successfully!' : 'Customer added successfully!' });
@@ -125,6 +99,7 @@ const AddCustomer = ({ user }) => {
       // Clear form
       handleClear();
     } catch (error) {
+      console.error('AddCustomer: Save error:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to add customer' });
     } finally {
       setLoading(false);

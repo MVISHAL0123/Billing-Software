@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const Purchase = ({ onNavigateToDashboard }) => {
   const [billNo, setBillNo] = useState('');
@@ -61,24 +61,17 @@ const Purchase = ({ onNavigateToDashboard }) => {
 
   const generateGrnNo = async () => {
     try {
-      // Get the next GRN number from the database
-      const response = await fetch(`${API_BASE_URL}/purchases/next-grn-number`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      if (data.success && data.nextGrnNo) {
-        setGrnNo(data.nextGrnNo.toString());
-      } else {
-        console.error('Error getting GRN number:', data.message);
-        // Start from 1 if error
-        setGrnNo('1');
-      }
-      
+      console.log('Purchase: Generating GRN number...');
+      // Get all purchases and use the max GRN number + 1
+      const allPurchasesData = await firestoreService.getPurchases();
+      const grnNumbers = allPurchasesData
+        .map(p => parseInt(p.grnNo || 0))
+        .filter(n => !isNaN(n));
+      const nextGrnNo = Math.max(...grnNumbers, 0) + 1;
+      console.log('Purchase: Next GRN number:', nextGrnNo);
+      setGrnNo(nextGrnNo.toString());
     } catch (error) {
-      console.error('Error generating GRN number:', error);
+      console.error('Purchase: Error generating GRN number:', error);
       // Start from 1 if error
       setGrnNo('1');
     }
@@ -86,69 +79,36 @@ const Purchase = ({ onNavigateToDashboard }) => {
 
   const fetchSuppliers = async () => {
     try {
-      console.log('Fetching suppliers from API...');
-      const response = await fetch(`${API_BASE_URL}/suppliers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Response status:', response.status);
-      const data = await response.json();
-      console.log('API Response:', data);
-      if (data.success) {
-        setSuppliers(data.suppliers || []);
-        console.log('Suppliers loaded:', data.suppliers?.length || 0, 'suppliers:', data.suppliers);
-      } else {
-        console.error('Failed to fetch suppliers:', data.message);
-        setSuppliers([]);
-      }
+      console.log('Purchase: Fetching suppliers from Firestore...');
+      const data = await firestoreService.getSuppliers();
+      console.log('Purchase: Suppliers loaded:', data.length, 'suppliers');
+      setSuppliers(data || []);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
+      console.error('Purchase: Error fetching suppliers:', error);
       setSuppliers([]);
     }
   };
 
   const fetchProducts = async () => {
     try {
-      console.log('Fetching products from API...');
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Products response status:', response.status);
-      const data = await response.json();
-      console.log('Products API Response:', data);
-      if (data.success) {
-        setProducts(data.products);
-        console.log('Products loaded:', data.products.length, 'products:', data.products);
-      } else {
-        console.error('Failed to fetch products:', data.message);
-      }
+      console.log('Purchase: Fetching products from Firestore...');
+      const data = await firestoreService.getProducts();
+      console.log('Purchase: Products loaded:', data.length, 'products');
+      setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Purchase: Error fetching products:', error);
     }
   };
 
   const fetchAllPurchases = async () => {
     try {
-      console.log('Fetching all purchases from API...');
-      const response = await fetch(`${API_BASE_URL}/purchases/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      if (data.success) {
-        const sortedPurchases = (data.purchases || []).sort((a, b) => parseInt(a.billNo) - parseInt(b.billNo));
-        setAllPurchases(sortedPurchases);
-        console.log('All purchases loaded:', sortedPurchases.length, 'purchases');
-      } else {
-        console.error('Failed to fetch purchases:', data.message);
-        setAllPurchases([]);
-      }
+      console.log('Purchase: Fetching all purchases from Firestore...');
+      const data = await firestoreService.getPurchases();
+      const sortedPurchases = (data || []).sort((a, b) => parseInt(a.grnNo || 0) - parseInt(b.grnNo || 0));
+      setAllPurchases(sortedPurchases);
+      console.log('Purchase: All purchases loaded:', sortedPurchases.length, 'purchases');
     } catch (error) {
-      console.error('Error fetching purchases:', error);
+      console.error('Purchase: Error fetching purchases:', error);
       setAllPurchases([]);
     }
   };
@@ -537,22 +497,13 @@ const Purchase = ({ onNavigateToDashboard }) => {
       total: calculateTotal()
     };
 
-    // Save in background without blocking UI
-    fetch(`${API_BASE_URL}/purchases/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(purchaseData)
-    })
-    .then(response => response.json())
+    // Save to Firestore in background without blocking UI
+    firestoreService.addPurchase(purchaseData)
     .then(data => {
       if (data.success) {
-        // Update GRN number from server if provided
-        if (data.nextGrnNo) {
-          setGrnNo(data.nextGrnNo);
-        }
+        console.log('Purchase: Purchase saved successfully:', data.id);
+        // Update GRN number
+        generateGrnNo();
         // Update purchases list in background
         fetchAllPurchases().catch(console.error);
         localStorage.setItem('lastPurchaseGrnNo', currentGrn);
@@ -562,7 +513,7 @@ const Purchase = ({ onNavigateToDashboard }) => {
       }
     })
     .catch(error => {
-      console.error('Save error:', error);
+      console.error('Purchase: Save error:', error);
       setSuccessMessage('❌ Save failed - check connection');
       setTimeout(() => setSuccessMessage(''), 3000);
     });

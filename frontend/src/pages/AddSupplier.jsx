@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const AddSupplier = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -21,29 +21,16 @@ const AddSupplier = ({ user }) => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      // Handle authentication errors
-      if (!response.ok && (response.status === 401 || data.message?.includes('Token'))) {
-        localStorage.clear();
-        alert('Session expired. Please login again.');
-        window.location.reload();
-        return;
-      }
-      
-      if (data.success) {
-        setSuppliers(data.suppliers || []);
+      console.log('AddSupplier: Fetching suppliers from Firestore...');
+      const data = await firestoreService.getCollection('suppliers');
+      console.log('AddSupplier: Got suppliers:', data);
+      if (data && data.length > 0) {
+        setSuppliers(data);
       } else {
-        console.error('Failed to fetch suppliers:', data.message);
         setSuppliers([]);
       }
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
+      console.error('AddSupplier: Error fetching suppliers:', error);
       setSuppliers([]);
     }
   };
@@ -95,30 +82,14 @@ const AddSupplier = ({ user }) => {
     setLoading(true);
 
     try {
-      const url = editingSupplierId
-        ? `${API_BASE_URL}/suppliers/${editingSupplierId}`
-        : `${API_BASE_URL}/suppliers/add`;
+      console.log('AddSupplier: Saving to Firestore...', editingSupplierId ? 'update' : 'create');
       
-      const response = await fetch(url, {
-        method: editingSupplierId ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // If token is invalid, clear localStorage and reload
-        if (response.status === 401 || data.message?.includes('Token')) {
-          localStorage.clear();
-          alert('Session expired. Please login again.');
-          window.location.reload();
-          return;
-        }
-        throw new Error(data.message || (editingSupplierId ? 'Failed to update supplier' : 'Failed to add supplier'));
+      if (editingSupplierId) {
+        // Update existing supplier
+        await firestoreService.updateSupplier(editingSupplierId, formData);
+      } else {
+        // Add new supplier
+        await firestoreService.addSupplier(formData);
       }
 
       setMessage({ type: 'success', text: editingSupplierId ? 'Supplier updated successfully!' : 'Supplier added successfully!' });
@@ -129,6 +100,7 @@ const AddSupplier = ({ user }) => {
       // Clear form
       handleClear();
     } catch (error) {
+      console.error('AddSupplier: Save error:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to add supplier' });
     } finally {
       setLoading(false);

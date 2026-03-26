@@ -58,19 +58,23 @@ const Stock = ({ onNavigateToDashboard }) => {
       setLoading(true);
       setError(null);
       
+      console.log('Stock Page: Fetching products from Firestore...');
       // Fetch from Firestore instead of API
       const data = await firestoreService.getProducts();
+      console.log('Stock Page: Got products:', data);
       
       if (data && data.length > 0) {
+        console.log('Stock Page: Setting products, count:', data.length);
         setProducts(data);
       } else {
+        console.log('Stock Page: No products found');
         setProducts([]);
       }
     } catch (error) {
-      console.error('Failed to fetch products:', error);
+      console.error('Stock Page: Failed to fetch products:', error);
       setError({
         type: 'FIREBASE_ERROR',
-        message: 'Failed to load products from database'
+        message: 'Failed to load products from database: ' + error.message
       });
       setProducts([]);
     } finally {

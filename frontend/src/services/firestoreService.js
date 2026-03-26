@@ -14,28 +14,36 @@ import {
   Timestamp
 } from 'firebase/firestore';
 
+console.log('Firestore Service Initialized - DB instance:', db);
+
 export const firestoreService = {
   // Products
   getProducts: async () => {
     try {
+      console.log('Fetching products from Firestore...');
       const snapshot = await getDocs(collection(db, 'products'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('Products fetched:', snapshot.docs.length, 'items');
+      const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('Mapped products:', products);
+      return products;
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching products:', error.code, error.message);
       return [];
     }
   },
 
   addProduct: async (product) => {
     try {
+      console.log('Adding product to Firestore:', product);
       const docRef = await addDoc(collection(db, 'products'), {
         ...product,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
+      console.log('Product added with ID:', docRef.id);
       return { success: true, id: docRef.id, ...product };
     } catch (error) {
-      console.error('Error adding product:', error);
+      console.error('Error adding product:', error.code, error.message);
       return { success: false, message: error.message };
     }
   },
@@ -95,6 +103,41 @@ export const firestoreService = {
       return { success: true, ...updates };
     } catch (error) {
       console.error('Error updating customer:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  // Suppliers
+  getSuppliers: async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'suppliers'));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      return [];
+    }
+  },
+
+  addSupplier: async (supplier) => {
+    try {
+      const docRef = await addDoc(collection(db, 'suppliers'), {
+        ...supplier,
+        createdAt: Timestamp.now()
+      });
+      return { success: true, id: docRef.id, ...supplier };
+    } catch (error) {
+      console.error('Error adding supplier:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  updateSupplier: async (supplierId, updates) => {
+    try {
+      const docRef = doc(db, 'suppliers', supplierId);
+      await updateDoc(docRef, updates);
+      return { success: true, ...updates };
+    } catch (error) {
+      console.error('Error updating supplier:', error);
       return { success: false, message: error.message };
     }
   },
