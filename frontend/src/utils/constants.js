@@ -1,7 +1,7 @@
 // Use appropriate API based on environment
 const isProd = import.meta.env.PROD;
 const baseUrl = isProd 
-  ? 'https://billing--software.cloudfunctions.net/api'  // Firebase Cloud Functions
+  ? '/api'  // Relative path - backend should be on same domain
   : (import.meta.env.VITE_API_URL || 'http://localhost:5003/api');
 
 export const API_BASE_URL = baseUrl;
