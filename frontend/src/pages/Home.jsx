@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import stockAnalysisService from '../services/stockAnalysisService';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { API_BASE_URL } from '../utils/constants';
 
 const Home = () => {
   const [monthlySales, setMonthlySales] = useState([]);
@@ -11,43 +12,40 @@ const Home = () => {
     const fetchMonthlySales = async () => {
       try {
         setMonthlySalesLoading(true);
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/bills/list`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if (data.success && data.bills) {
-          const salesByMonth = {};
-          data.bills.forEach(bill => {
-            let dateObj = null;
-            if (bill.date) {
-              if (!isNaN(Date.parse(bill.date))) {
-                dateObj = new Date(bill.date);
-              } else if (typeof bill.date === 'string' && bill.date.match(/^\d{4}-\d{2}-\d{2}/)) {
-                const [y, m, d] = bill.date.split('-');
-                dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-              }
+        console.log('Home: Fetching bills from Firestore...');
+        const billsData = await firestoreService.getBills();
+        console.log('Home: Bills fetched:', billsData.length);
+        const salesByMonth = {};
+        billsData.forEach(bill => {
+          let dateObj = null;
+          if (bill.date) {
+            if (!isNaN(Date.parse(bill.date))) {
+              dateObj = new Date(bill.date);
+            } else if (typeof bill.date === 'string' && bill.date.match(/^\d{4}-\d{2}-\d{2}/)) {
+              const [y, m, d] = bill.date.split('-');
+              dateObj = new Date(Number(y), Number(m) - 1, Number(d));
             }
-            if (!dateObj || isNaN(dateObj.getTime())) return;
-            const month = dateObj.toLocaleString('default', { month: 'short' });
-            const year = dateObj.getFullYear().toString().slice(-2);
-            const key = `${month} '${year}`;
-            if (!salesByMonth[key]) salesByMonth[key] = 0;
-            salesByMonth[key] += bill.total || 0;
+          }
+          if (!dateObj || isNaN(dateObj.getTime())) return;
+          const month = dateObj.toLocaleString('default', { month: 'short' });
+          const year = dateObj.getFullYear().toString().slice(-2);
+          const key = `${month} '${year}`;
+          if (!salesByMonth[key]) salesByMonth[key] = 0;
+          salesByMonth[key] += bill.total || 0;
+        });
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const monthlyArr = Object.entries(salesByMonth)
+          .map(([month, total]) => ({ month, total: Math.round(total) }))
+          .sort((a, b) => {
+            const [ma, ya] = a.month.split(" '");
+            const [mb, yb] = b.month.split(" '");
+            const da = new Date(Number('20' + ya), months.indexOf(ma));
+            const db = new Date(Number('20' + yb), months.indexOf(mb));
+            return da - db;
           });
-          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const monthlyArr = Object.entries(salesByMonth)
-            .map(([month, total]) => ({ month, total: Math.round(total) }))
-            .sort((a, b) => {
-              const [ma, ya] = a.month.split(" '");
-              const [mb, yb] = b.month.split(" '");
-              const da = new Date(Number('20' + ya), months.indexOf(ma));
-              const db = new Date(Number('20' + yb), months.indexOf(mb));
-              return da - db;
-            });
-          setMonthlySales(monthlyArr);
-        }
+        setMonthlySales(monthlyArr);
       } catch (err) {
+        console.error('Home: Error fetching monthly sales:', err);
         setMonthlySales([]);
       } finally {
         setMonthlySalesLoading(false);
@@ -108,29 +106,25 @@ const Home = () => {
   const loadTopSellingProducts = async () => {
     try {
       setChartLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/bills/list`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success && data.bills) {
-        const productSales = {};
-        data.bills.forEach(bill => {
-          (bill.items || []).forEach(item => {
-            const name = item.productName;
-            if (!name) return;
-            if (!productSales[name]) productSales[name] = { name, qtySold: 0, revenue: 0 };
-            productSales[name].qtySold += (item.qty || 0);
-            productSales[name].revenue += (item.amount || 0);
-          });
+      console.log('Home: Fetching bills for top products...');
+      const billsData = await firestoreService.getBills();
+      console.log('Home: Bills fetched for chart:', billsData.length);
+      const productSales = {};
+      billsData.forEach(bill => {
+        (bill.items || []).forEach(item => {
+          const name = item.productName;
+          if (!name) return;
+          if (!productSales[name]) productSales[name] = { name, qtySold: 0, revenue: 0 };
+          productSales[name].qtySold += (item.qty || 0);
+          productSales[name].revenue += (item.amount || 0);
         });
-        const sorted = Object.values(productSales)
-          .sort((a, b) => b.qtySold - a.qtySold)
-          .slice(0, 5);
-        setTopProducts(sorted);
-      }
+      });
+      const sorted = Object.values(productSales)
+        .sort((a, b) => b.qtySold - a.qtySold)
+        .slice(0, 5);
+      setTopProducts(sorted);
     } catch (err) {
-      console.error('Error loading top products:', err);
+      console.error('Home: Error loading top products:', err);
     } finally {
       setChartLoading(false);
     }

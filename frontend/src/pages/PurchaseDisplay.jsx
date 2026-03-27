@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
   const [purchases, setPurchases] = useState([]);
@@ -79,31 +79,17 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
       setLoading(true);
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/purchases/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      console.log('PurchaseDisplay: Fetching purchases from Firestore...');
+      const data = await firestoreService.getPurchases();
+      console.log('PurchaseDisplay: Purchases fetched:', data.length);
+      const sortedPurchases = (data || []).sort((a, b) => {
+        const grnA = parseInt(a.grnNo?.replace?.(/\D/g, '') || 0);
+        const grnB = parseInt(b.grnNo?.replace?.(/\D/g, '') || 0);
+        return grnA - grnB;
       });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          // Sort purchases by GRN number in ascending order
-          const sortedPurchases = (data.purchases || []).sort((a, b) => {
-            const grnA = parseInt(a.grnNo.replace(/\D/g, '')) || 0;
-            const grnB = parseInt(b.grnNo.replace(/\D/g, '')) || 0;
-            return grnA - grnB;
-          });
-          setPurchases(sortedPurchases);
-        } else {
-          console.error('Failed to fetch purchases:', data.message);
-          setPurchases([]);
-        }
-      } else {
-        console.error('Failed to fetch purchases');
-        setPurchases([]);
-      }
+      setPurchases(sortedPurchases);
     } catch (error) {
-      console.error('Error fetching purchases:', error);
+      console.error('PurchaseDisplay: Error fetching purchases:', error);
       setPurchases([]);
     } finally {
       if (!silent) {
@@ -114,50 +100,24 @@ const PurchaseDisplay = ({ user, onNavigateToDashboard }) => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setAllSuppliers(data.suppliers || []);
-        } else {
-          console.error('Failed to fetch suppliers:', data.message);
-          setAllSuppliers([]);
-        }
-      } else {
-        console.error('Failed to fetch suppliers');
-        setAllSuppliers([]);
-      }
+      console.log('PurchaseDisplay: Fetching suppliers from Firestore...');
+      const data = await firestoreService.getSuppliers();
+      console.log('PurchaseDisplay: Suppliers fetched:', data.length);
+      setAllSuppliers(data || []);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
+      console.error('PurchaseDisplay: Error fetching suppliers:', error);
       setAllSuppliers([]);
     }
   };
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setAllProducts(data.products || []);
-        } else {
-          console.error('Failed to fetch products:', data.message);
-          setAllProducts([]);
-        }
-      } else {
-        console.error('Failed to fetch products');
-        setAllProducts([]);
-      }
+      console.log('PurchaseDisplay: Fetching products from Firestore...');
+      const data = await firestoreService.getProducts();
+      console.log('PurchaseDisplay: Products fetched:', data.length);
+      setAllProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('PurchaseDisplay: Error fetching products:', error);
       setAllProducts([]);
     }
   };

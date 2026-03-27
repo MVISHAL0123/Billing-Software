@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '../utils/constants';
+import { firestoreService } from '../services/firestoreService';
 
 const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustomer }) => {
   const [sales, setSales] = useState([]);
@@ -79,25 +79,16 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
       setLoading(true);
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/bills/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      console.log('SalesDisplay: Fetching bills from Firestore...');
+      const data = await firestoreService.getBills();
+      console.log('SalesDisplay: Bills fetched:', data.length);
+      // Sort bills by invoice number in ascending order
+      const sortedBills = (data || []).sort((a, b) => {
+        const invoiceA = parseInt(a.billNo) || 0;
+        const invoiceB = parseInt(b.billNo) || 0;
+        return invoiceA - invoiceB;
       });
-      const data = await response.json();
-
-      if (data.success) {
-        // Sort bills by invoice number in ascending order
-        const sortedBills = (data.bills || []).sort((a, b) => {
-          const invoiceA = parseInt(a.billNo) || 0;
-          const invoiceB = parseInt(b.billNo) || 0;
-          return invoiceA - invoiceB;
-        });
-        setSales(sortedBills);
-      } else {
-        console.error('Failed to fetch sales:', data.message);
-        setSales([]);
-      }
+      setSales(sortedBills);
     } catch (error) {
       console.error('Error fetching sales:', error);
       setSales([]);
@@ -110,46 +101,24 @@ const SalesDisplay = ({ user, onNavigateToDashboard, onNavigateToSalesWithCustom
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/customers/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        setAllCustomers(data.customers || []);
-      } else {
-        console.error('Failed to fetch customers:', data.message);
-        setAllCustomers([]);
-      }
+      console.log('SalesDisplay: Fetching customers from Firestore...');
+      const data = await firestoreService.getCustomers();
+      console.log('SalesDisplay: Customers fetched:', data.length);
+      setAllCustomers(data || []);
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error('SalesDisplay: Error fetching customers:', error);
       setAllCustomers([]);
     }
   };
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setAllProducts(data.products || []);
-        } else {
-          console.error('Failed to fetch products:', data.message);
-          setAllProducts([]);
-        }
-      } else {
-        console.error('Failed to fetch products');
-        setAllProducts([]);
-      }
+      console.log('SalesDisplay: Fetching products from Firestore...');
+      const data = await firestoreService.getProducts();
+      console.log('SalesDisplay: Products fetched:', data.length);
+      setAllProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('SalesDisplay: Error fetching products:', error);
       setAllProducts([]);
     }
   };

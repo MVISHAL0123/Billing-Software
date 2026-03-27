@@ -4,8 +4,10 @@ import jwt from 'jsonwebtoken';
 export const login = async (req, res) => {
   try {
     const { username, password, role } = req.body;
+    console.log(`🔐 Login attempt: username=${username}, role=${role}`);
 
     if (!username || !password || !role) {
+      console.log('❌ Missing credentials');
       return res.status(400).json({
         success: false,
         message: 'Username, password, and role are required'
@@ -13,12 +15,16 @@ export const login = async (req, res) => {
     }
 
     // Find user in database
+    console.log(`🔍 Looking up user: ${username} with role: ${role}`);
     const user = await User.findOne([
       { field: 'username', operator: '==', value: username },
       { field: 'role', operator: '==', value: role }
     ]);
 
+    console.log(user ? `✅ User found: ${user.username}` : `❌ User not found`);
+
     if (!user) {
+      console.log(`❌ Invalid ${role} credentials`);
       return res.status(401).json({
         success: false,
         message: `Invalid ${role} credentials`
@@ -27,12 +33,15 @@ export const login = async (req, res) => {
 
     // Check password (in production, use bcrypt to compare hashed passwords)
     if (user.password !== password) {
+      console.log('❌ Invalid password');
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
 
+    console.log('✅ Password match - generating JWT token');
+    
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -53,6 +62,7 @@ export const login = async (req, res) => {
       token: token
     };
 
+    console.log(`✅ Login successful: ${username}`);
     res.status(200).json({
       success: true,
       message: `Login successful as ${role}`,
@@ -60,7 +70,7 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
