@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { firestoreService } from '../services/firestoreService';
+import { API_BASE_URL } from '../utils/constants';
 
 const Settings = ({ user, onUpdateUser }) => {
   const [formData, setFormData] = useState({
