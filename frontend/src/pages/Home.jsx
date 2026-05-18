@@ -110,7 +110,7 @@ const Home = () => {
     try {
       setChartLoading(true);
       console.log('Home: Fetching bills for top products...');
-      const billsData = await firestoreService.getBills();
+      const billsData = await indexedDBService.getAllBills();
       console.log('Home: Bills fetched for chart:', billsData.length);
       const productSales = {};
       billsData.forEach(bill => {

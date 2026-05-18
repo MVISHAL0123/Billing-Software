@@ -1,5 +1,5 @@
 // Stock Analysis Service - Analyzes stock data and generates alerts
-import { API_BASE_URL } from '../utils/constants';
+import { indexedDBService } from './indexedDBService';
 
 class StockAnalysisService {
   constructor() {
@@ -11,24 +11,12 @@ class StockAnalysisService {
     };
   }
 
-  // Fetch products from API
+  // Fetch products from IndexedDB (offline)
   async fetchProducts() {
     try {
-      const response = await fetch(`${API_BASE_URL}/products/list`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        return data.products || [];
-      } else {
-        console.error('Failed to fetch products:', data.message);
-        return [];
-      }
+      return await indexedDBService.getAllProducts();
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching products from IndexedDB:', error);
       return [];
     }
   }

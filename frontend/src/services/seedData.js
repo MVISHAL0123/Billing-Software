@@ -4,6 +4,7 @@ import { firestoreService } from './firestoreService';
 const SAMPLE_DATA = {
   products: [
     {
+      id: 'prod_001',
       productName: 'Laptop',
       sku: 'PROD001',
       purchaseRate: 35000,
@@ -15,6 +16,7 @@ const SAMPLE_DATA = {
       description: 'High-performance laptop computer'
     },
     {
+      id: 'prod_002',
       productName: 'Mouse',
       sku: 'PROD002',
       purchaseRate: 300,
@@ -26,6 +28,7 @@ const SAMPLE_DATA = {
       description: 'Wireless mouse'
     },
     {
+      id: 'prod_003',
       productName: 'Keyboard',
       sku: 'PROD003',
       purchaseRate: 800,
@@ -37,6 +40,7 @@ const SAMPLE_DATA = {
       description: 'Mechanical keyboard'
     },
     {
+      id: 'prod_004',
       productName: 'Monitor',
       sku: 'PROD004',
       purchaseRate: 8000,
@@ -48,6 +52,7 @@ const SAMPLE_DATA = {
       description: '24-inch LED monitor'
     },
     {
+      id: 'prod_005',
       productName: 'USB Cable',
       sku: 'PROD005',
       purchaseRate: 100,
@@ -61,6 +66,7 @@ const SAMPLE_DATA = {
   ],
   customers: [
     {
+      id: 'cust_001',
       customerName: 'Acme Corp',
       phoneNumber: '9876543210',
       email: 'contact@acmecorp.com',
@@ -68,6 +74,7 @@ const SAMPLE_DATA = {
       gstNumber: '33AABCT1234H1Z0'
     },
     {
+      id: 'cust_002',
       customerName: 'Tech Solutions',
       phoneNumber: '9765432109',
       email: 'info@techsolutions.com',
@@ -75,6 +82,7 @@ const SAMPLE_DATA = {
       gstNumber: '29AABCT1234H1Z0'
     },
     {
+      id: 'cust_003',
       customerName: 'Metro Industries',
       phoneNumber: '9654321098',
       email: 'sales@metroindustries.com',
@@ -84,6 +92,7 @@ const SAMPLE_DATA = {
   ],
   suppliers: [
     {
+      id: 'supp_001',
       supplierName: 'Global Supplies',
       phoneNumber: '9123456789',
       email: 'sales@globalsupplies.com',
@@ -91,6 +100,7 @@ const SAMPLE_DATA = {
       gstNumber: '07AABCT1234H1Z0'
     },
     {
+      id: 'supp_002',
       supplierName: 'Premium Parts Ltd',
       phoneNumber: '9234567890',
       email: 'contact@premiumparts.com',
