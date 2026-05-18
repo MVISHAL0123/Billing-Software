@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, onNavigateToAddProduct, onNavigateToAddCustomer, onNavigateToAddSupplier, onNavigateToSales, onNavigateToSalesDisplay, onNavigateToSalesReport, onNavigateToPurchase, onNavigateToPurchaseDisplay, onNavigateToStock }) => {
+const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDataMigration, onNavigateToDashboard, onNavigateToAddProduct, onNavigateToAddCustomer, onNavigateToAddSupplier, onNavigateToSales, onNavigateToSalesDisplay, onNavigateToSalesReport, onNavigateToPurchase, onNavigateToPurchaseDisplay, onNavigateToStock }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isSalesOpen, setIsSalesOpen] = useState(false);
@@ -369,6 +369,21 @@ const Header = ({ user, onLogout, onNavigateToSettings, onNavigateToDashboard, o
                               <div className="absolute inset-0 bg-blue-600 rounded-full opacity-0 group-hover/item:opacity-10 transition-opacity"></div>
                             </div>
                             <span>Settings</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setIsDropdownOpen(false);
+                              onNavigateToDataMigration();
+                            }}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-gray-700 hover:bg-green-50 transition-all duration-200 font-medium group/item"
+                          >
+                            <div className="relative">
+                              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                              </svg>
+                              <div className="absolute inset-0 bg-green-600 rounded-full opacity-0 group-hover/item:opacity-10 transition-opacity"></div>
+                            </div>
+                            <span>Data Migration</span>
                           </button>
                           <hr className="my-2 border-blue-100" />
                         </>

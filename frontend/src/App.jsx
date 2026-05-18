@@ -3,6 +3,7 @@ import { Header, Footer } from './components';
 import Home from './pages/Home';
 import StaffDashboard from './pages/StaffDashboard';
 import Settings from './pages/Settings';
+import DataMigration from './pages/DataMigration';
 import AddProduct from './pages/AddProduct';
 import AddCustomer from './pages/AddCustomer';
 import Sales from './pages/Sales';
@@ -103,6 +104,10 @@ function App() {
     setCurrentPage('settings');
   };
 
+  const navigateToDataMigration = () => {
+    setCurrentPage('dataMigration');
+  };
+
   const navigateToDashboard = () => {
     setCurrentPage('dashboard');
   };
@@ -160,6 +165,7 @@ function App() {
           user={user} 
           onLogout={handleLogout} 
           onNavigateToSettings={navigateToSettings}
+          onNavigateToDataMigration={navigateToDataMigration}
           onNavigateToDashboard={navigateToDashboard}
           onNavigateToAddProduct={navigateToAddProduct}
           onNavigateToAddCustomer={navigateToAddCustomer}
@@ -176,6 +182,8 @@ function App() {
       <main className="flex-grow">
         {currentPage === 'settings' ? (
           <Settings user={user} onUpdateUser={handleUpdateUser} />
+        ) : currentPage === 'dataMigration' ? (
+          <DataMigration />
         ) : currentPage === 'addProduct' ? (
           <AddProduct user={user} />
         ) : currentPage === 'addCustomer' ? (
