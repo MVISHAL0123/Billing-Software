@@ -1,0 +1,42 @@
+{
+  "build": {
+    "appId": "com.mmk.billing",
+    "productName": "MMK Billing Software",
+    "directories": {
+      "buildResources": "frontend/public",
+      "output": "frontend/dist-electron"
+    },
+    "files": [
+      "electron-main.js",
+      "frontend/dist/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "certificateFile": null,
+      "certificatePassword": null,
+      "signingHashAlgorithms": ["sha256"],
+      "icon": "frontend/public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MMK Billing Software",
+      "installerIcon": "frontend/public/icon.ico",
+      "uninstallerIcon": "frontend/public/icon.ico"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}.exe"
+    }
+  }
+}

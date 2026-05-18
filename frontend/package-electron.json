@@ -1,0 +1,59 @@
+{
+  "name": "mmk-billing-software",
+  "version": "1.0.0",
+  "description": "MMK Billing Software - Offline Desktop Application",
+  "main": "electron-main.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron-build": "npm run build && electron-builder",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "electron": "^latest",
+    "electron-builder": "^latest",
+    "vite": "^4.3.9",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.0.1"
+  },
+  "dependencies": {
+    "firebase": "^9.23.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.8.0",
+    "lucide-react": "^0.263.1"
+  },
+  "build": {
+    "appId": "com.mmk.billing",
+    "productName": "MMK Billing Software",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "electron-main.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        "portable"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MMK Billing Software"
+    }
+  }
+}
