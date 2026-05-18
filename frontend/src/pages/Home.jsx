@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import stockAnalysisService from '../services/stockAnalysisService';
 import { firestoreService } from '../services/firestoreService';
+import { seedFirestoreData } from '../services/seedData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -61,6 +62,8 @@ const Home = () => {
   const [notifications, setNotifications] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [chartLoading, setChartLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [seedMessage, setSeedMessage] = useState('');
 
   useEffect(() => {
     loadStockAnalysis();

@@ -17,56 +17,24 @@ const DEMO_USER = {
 export const authService = {
   login: async (username, password, role) => {
     try {
-      // Demo login - Try backend first, fall back to mock
+      // Demo login - for testing
       if (username.toLowerCase() === 'demo' && password === 'demo123') {
-        console.log('🔐 Demo login detected - calling backend at:', API_URL);
-        try {
-          const backendResponse = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, role })
-          });
-
-          console.log('📡 Backend response status:', backendResponse.status);
-          const data = await backendResponse.json();
-          console.log('📨 Backend response data:', data);
-
-          if (backendResponse.ok && data.success) {
-            console.log('✅ Backend demo login successful');
-            
-            const userObj = {
-              uid: data.user?.id || 'demo-user-123',
-              email: data.user?.email || 'demo@mmk.com',
-              name: data.user?.name || 'Demo Admin',
-              role: data.user?.role || 'admin',
-              username: data.user?.username || 'demo',
-              token: data.user?.token
-            };
-
-            localStorage.setItem('user', JSON.stringify(userObj));
-            localStorage.setItem('token', data.user?.token);
-            localStorage.setItem('isDemo', 'true');
-            console.log('✅ Token saved to localStorage:', data.user?.token?.substring(0, 20) + '...');
-            return { success: true, user: userObj };
-          } else {
-            console.warn('⚠️  Backend returned error:', data.message);
-          }
-        } catch (backendError) {
-          console.error('❌ Backend login error:', backendError);
-        }
-
-        // Fallback to mock demo user if backend fails
-        console.log('🔄 Falling back to mock demo user...');
-        try {
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.warn('Could not sign in anonymously:', e);
-        }
+        console.log('🔐 Demo login - Authenticating...');
         
-        localStorage.setItem('user', JSON.stringify(DEMO_USER));
-        localStorage.setItem('token', DEMO_USER.token);
+        const DEMO_USER_FINAL = {
+          uid: 'demo-user-123',
+          email: 'demo@mmk.com',
+          name: 'Demo Admin',
+          role: 'admin',
+          username: 'demo',
+          token: 'demo-token-123'
+        };
+
+        localStorage.setItem('user', JSON.stringify(DEMO_USER_FINAL));
+        localStorage.setItem('token', DEMO_USER_FINAL.token);
         localStorage.setItem('isDemo', 'true');
-        return { success: true, user: DEMO_USER };
+        console.log('✅ Demo user logged in successfully');
+        return { success: true, user: DEMO_USER_FINAL };
       }
 
       // Try logging in with email
