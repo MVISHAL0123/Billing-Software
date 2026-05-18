@@ -16,13 +16,22 @@ const firebaseConfig = {
   measurementId: "G-RXZ57VKK55"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase (safely, with fallback for offline mode)
+let app, analytics, db, auth;
 
-// Initialize Firebase services
-const analytics = getAnalytics(app);
-const db = getFirestore(app);
-const auth = getAuth(app);
+try {
+  app = initializeApp(firebaseConfig);
+  analytics = getAnalytics(app);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.warn('⚠️ Firebase initialization failed - running in offline mode:', error.message);
+  app = null;
+  analytics = null;
+  db = null;
+  auth = null;
+}
 
 export { app, analytics, db, auth };
 export default app;

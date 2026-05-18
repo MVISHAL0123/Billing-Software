@@ -8,9 +8,24 @@ import { indexedDBService } from './indexedDBService';
 
 class FirebaseBackupService {
   constructor() {
-    this.storage = getStorage();
+    this.storage = null; // Initialize lazily
     this.backupFolder = 'billing-backups';
     this.autoBackupInterval = null;
+  }
+
+  /**
+   * Initialize storage lazily when first needed
+   */
+  getStorageInstance() {
+    if (!this.storage) {
+      try {
+        this.storage = getStorage();
+      } catch (error) {
+        console.warn('⚠️ Firebase Cloud Storage not available - backups disabled:', error.message);
+        return null;
+      }
+    }
+    return this.storage;
   }
 
   /**
@@ -28,6 +43,12 @@ class FirebaseBackupService {
    */
   async uploadBackup() {
     try {
+      const storage = this.getStorageInstance();
+      if (!storage) {
+        console.log('⏭️ Firebase Cloud Storage unavailable - skipping backup');
+        return { success: false, message: 'Backup storage unavailable' };
+      }
+
       console.log('📤 Starting backup upload...');
       
       // Export all data
@@ -36,7 +57,7 @@ class FirebaseBackupService {
 
       // Upload to Firebase Storage
       const filename = this.getBackupFilename();
-      const storageRef = ref(this.storage, `${this.backupFolder}/${filename}`);
+      const storageRef = ref(storage, `${this.backupFolder}/${filename}`);
       
       await uploadString(storageRef, jsonString);
 
@@ -71,9 +92,14 @@ class FirebaseBackupService {
    */
   async downloadBackup(filename) {
     try {
+      const storage = this.getStorageInstance();
+      if (!storage) {
+        throw new Error('Firebase Cloud Storage unavailable');
+      }
+
       console.log('📥 Downloading backup:', filename);
       
-      const storageRef = ref(this.storage, `${this.backupFolder}/${filename}`);
+      const storageRef = ref(storage, `${this.backupFolder}/${filename}`);
       const bytes = await getBytes(storageRef);
       const decoder = new TextDecoder();
       const jsonString = decoder.decode(bytes);
@@ -92,9 +118,12 @@ class FirebaseBackupService {
    */
   async getBackupList() {
     try {
+      const storage = this.getStorageInstance();
+      if (!storage) return { success: true, backups: [] };
+
       console.log('📋 Fetching backup list...');
       
-      const folderRef = ref(this.storage, this.backupFolder);
+      const folderRef = ref(storage, this.backupFolder);
       const result = await listAll(folderRef);
 
       const backups = result.items.map(item => {
