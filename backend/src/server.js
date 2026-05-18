@@ -28,7 +28,20 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+// Configure CORS to allow requests from Firebase Hosting
+const corsOptions = {
+  origin: [
+    'https://mmkbills.web.app',      // Production Firebase Hosting
+    'http://localhost:5173',          // Local Vite dev server
+    'http://localhost:3000',          // Alternative local
+    'http://127.0.0.1:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
