@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { translateToTamil } from '../services/translationService';
-import { firestoreService } from '../services/firestoreService';
+import { indexedDBService } from '../services/indexedDBService';
 
 const AddProduct = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -30,7 +30,7 @@ const AddProduct = ({ user }) => {
     try {
       console.log('AddProduct: Fetching products from Firestore...');
       // Fetch from Firestore
-      const data = await firestoreService.getProducts();
+      const data = await indexedDBService.getAllProducts();
       console.log('AddProduct: Got products:', data);
       
       if (data && data.length > 0) {
@@ -157,16 +157,17 @@ const AddProduct = ({ user }) => {
       let result;
       
       if (editingProductId) {
-        // Update existing product in Firestore
-        result = await firestoreService.updateProduct(editingProductId, {
+        // Update existing product in IndexedDB
+        result = await indexedDBService.addProduct({
           ...formData,
+          id: editingProductId,
           purchaseRate: parseFloat(formData.purchaseRate),
           salesRate: parseFloat(formData.salesRate),
           marginPercentage: parseFloat(formData.marginPercentage)
         });
       } else {
-        // Add new product to Firestore
-        result = await firestoreService.addProduct({
+        // Add new product to IndexedDB
+        result = await indexedDBService.addProduct({
           ...formData,
           purchaseRate: parseFloat(formData.purchaseRate),
           salesRate: parseFloat(formData.salesRate),

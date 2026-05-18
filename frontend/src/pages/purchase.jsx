@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { firestoreService } from '../services/firestoreService';
+import { indexedDBService } from '../services/indexedDBService';
 
 const Purchase = ({ onNavigateToDashboard }) => {
   const [billNo, setBillNo] = useState('');

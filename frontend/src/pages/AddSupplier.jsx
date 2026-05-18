@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { firestoreService } from '../services/firestoreService';
+import { indexedDBService } from '../services/indexedDBService';
 
 const AddSupplier = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -22,7 +22,7 @@ const AddSupplier = ({ user }) => {
   const fetchSuppliers = async () => {
     try {
       console.log('AddSupplier: Fetching suppliers from Firestore...');
-      const data = await firestoreService.getCollection('suppliers');
+      const data = await indexedDBService.getAllSuppliers();
       console.log('AddSupplier: Got suppliers:', data);
       if (data && data.length > 0) {
         setSuppliers(data);
@@ -86,10 +86,10 @@ const AddSupplier = ({ user }) => {
       
       if (editingSupplierId) {
         // Update existing supplier
-        await firestoreService.updateSupplier(editingSupplierId, formData);
+        await indexedDBService.addSupplier({...formData, id: editingSupplierId});
       } else {
         // Add new supplier
-        await firestoreService.addSupplier(formData);
+        await indexedDBService.addSupplier(formData);
       }
 
       setMessage({ type: 'success', text: editingSupplierId ? 'Supplier updated successfully!' : 'Supplier added successfully!' });

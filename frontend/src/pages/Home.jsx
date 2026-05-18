@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import stockAnalysisService from '../services/stockAnalysisService';
-import { firestoreService } from '../services/firestoreService';
+import { indexedDBService } from '../services/indexedDBService';
 import { seedFirestoreData } from '../services/seedData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { API_BASE_URL } from '../utils/constants';
@@ -13,8 +13,8 @@ const Home = () => {
     const fetchMonthlySales = async () => {
       try {
         setMonthlySalesLoading(true);
-        console.log('Home: Fetching bills from Firestore...');
-        const billsData = await firestoreService.getBills();
+        console.log('Home: Fetching bills from IndexedDB...');
+        const billsData = await indexedDBService.getAllBills();
         console.log('Home: Bills fetched:', billsData.length);
         const salesByMonth = {};
         billsData.forEach(bill => {

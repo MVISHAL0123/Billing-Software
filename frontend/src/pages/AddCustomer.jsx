@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { firestoreService } from '../services/firestoreService';
+import { indexedDBService } from '../services/indexedDBService';
 
 const AddCustomer = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -22,7 +22,7 @@ const AddCustomer = ({ user }) => {
   const fetchCustomers = async () => {
     try {
       console.log('AddCustomer: Fetching customers from Firestore...');
-      const data = await firestoreService.getCustomers();
+      const data = await indexedDBService.getAllCustomers();
       console.log('AddCustomer: Got customers:', data);
       if (data && data.length > 0) {
         setCustomers(data);
@@ -85,10 +85,10 @@ const AddCustomer = ({ user }) => {
       
       if (editingCustomerId) {
         // Update existing customer
-        await firestoreService.updateCustomer(editingCustomerId, formData);
+        await indexedDBService.addCustomer({...formData, id: editingCustomerId});
       } else {
         // Add new customer
-        await firestoreService.addCustomer(formData);
+        await indexedDBService.addCustomer(formData);
       }
 
       setMessage({ type: 'success', text: editingCustomerId ? 'Customer updated successfully!' : 'Customer added successfully!' });
