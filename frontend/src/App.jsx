@@ -17,7 +17,6 @@ import Login from './pages/Login';
 
 import { offlineAuthService } from './services/offlineAuthService';
 import { firebaseBackupService } from './services/firebaseBackupService';
-import { seedFirestoreData } from './services/seedData';
 import { indexedDBService } from './services/indexedDBService';
 
 function App() {
@@ -50,20 +49,6 @@ function App() {
       
       // Initialize IndexedDB and default users
       await offlineAuthService.initializeDefaultUsers();
-      
-      // Seed sample data if database is empty
-      const products = await indexedDBService.getAllProducts();
-      if (products.length === 0) {
-        console.log('📦 Database empty - seeding sample data...');
-        const seedResult = await seedFirestoreData();
-        if (seedResult.success) {
-          console.log('✅ Sample data seeded successfully');
-        } else {
-          console.warn('⚠️ Failed to seed sample data:', seedResult.error);
-        }
-      } else {
-        console.log(`📦 Database already has ${products.length} products - skipping seed`);
-      }
       
       // Start auto-backup to Firebase
       firebaseBackupService.startAutoBackup();

@@ -10,19 +10,11 @@ import purchaseRoutes from './routes/purchaseRoutes.js';
 import translationRoutes from './routes/translationRoutes.js';
 import voiceRoutes from './routes/voiceRoutes.js';
 import { initializeFirebase } from '../config/database.js';
-import { seedUsers } from './utils/seedUsers.js';
 
 dotenv.config();
 
 // Connect to Firebase
 const firebaseConnected = initializeFirebase();
-
-// Seed default users after Firebase connection (only if connected)
-if (firebaseConnected) {
-  seedUsers();
-} else {
-  console.log('⚠️  Skipping user seeding - Firebase not connected');
-}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
