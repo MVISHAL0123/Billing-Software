@@ -14,7 +14,8 @@ import Stock from './pages/Stock';
 import AddSupplier from './pages/AddSupplier';
 import Login from './pages/Login';
 
-import { authService } from './services/authService';
+import { offlineAuthService } from './services/offlineAuthService';
+import { firebaseBackupService } from './services/firebaseBackupService';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -39,10 +40,27 @@ function App() {
     }
   }, []);
 
+  // Initialize offline services on app startup
+  useEffect(() => {
+    const initializeApp = async () => {
+      console.log('🚀 Initializing offline billing app...');
+      
+      // Initialize IndexedDB and default users
+      await offlineAuthService.initializeDefaultUsers();
+      
+      // Start auto-backup to Firebase
+      firebaseBackupService.startAutoBackup();
+      
+      console.log('✅ App initialized successfully');
+    };
+    
+    initializeApp();
+  }, []);
+
   useEffect(() => {
     // Check if user is already logged in
-    if (authService.isAuthenticated()) {
-      const currentUser = authService.getCurrentUser();
+    if (offlineAuthService.isAuthenticated()) {
+      const currentUser = offlineAuthService.getCurrentUser();
       setUser(currentUser);
       setIsLoggedIn(true);
     }
@@ -54,10 +72,8 @@ function App() {
     setCurrentPage('dashboard');
   };
 
-
-
   const handleLogout = () => {
-    authService.logout();
+    offlineAuthService.logout();
     setUser(null);
     setIsLoggedIn(false);
     setCurrentPage('dashboard');
@@ -65,7 +81,6 @@ function App() {
 
   const handleUpdateUser = (updatedUser) => {
     setUser(updatedUser);
-    authService.updateCurrentUser(updatedUser);
   };
 
   const navigateToSettings = () => {

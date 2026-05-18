@@ -1,17 +1,27 @@
-import { useState } from 'react';
-import { authService } from '../services/authService';
+import { useState, useEffect } from 'react';
+import { offlineAuthService } from '../services/offlineAuthService';
 
 const Login = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ username: '', password: '', role: 'admin' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [initMessage, setInitMessage] = useState('Loading...');
+
+  // Initialize default users on component mount
+  useEffect(() => {
+    const init = async () => {
+      await offlineAuthService.initializeDefaultUsers();
+      setInitMessage('');
+    };
+    init();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const result = await authService.login(credentials.username, credentials.password, credentials.role);
+    const result = await offlineAuthService.login(credentials.username, credentials.password, credentials.role);
     
     if (result.success) {
       onLogin(result.user);
@@ -43,7 +53,15 @@ const Login = ({ onLogin }) => {
         <h1 className="text-4xl font-black text-center mb-2 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
           Welcome Back
         </h1>
-        <p className="text-center text-gray-600 mb-6">Please sign in to your account</p>
+        <p className="text-center text-gray-600 mb-2">Please sign in to your account</p>
+        
+        {/* Offline Mode Badge */}
+        <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-xs font-semibold text-green-700">Offline Mode - All data stored locally</span>
+        </div>
 
         {/* Role Selection */}
         <div className="flex gap-4 mb-6">
@@ -139,11 +157,20 @@ const Login = ({ onLogin }) => {
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
 
-          {/* Demo Credentials Help */}
+        {/* Demo Credentials Help */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-blue-600 mb-2">Demo Credentials:</p>
-            <p className="text-xs text-blue-700 font-mono">Username: <span className="font-bold">demo</span></p>
-            <p className="text-xs text-blue-700 font-mono">Password: <span className="font-bold">demo123</span></p>
+            <p className="text-xs font-semibold text-blue-600 mb-3">Default Accounts:</p>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-blue-700 font-mono"><span className="font-bold">Admin:</span> admin / admin123</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-700 font-mono"><span className="font-bold">Staff:</span> staff / staff123</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-700 font-mono"><span className="font-bold">Demo:</span> demo / demo123</p>
+              </div>
+            </div>
           </div>
           </form>
         </div>
